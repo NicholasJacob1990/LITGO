@@ -1,51 +1,46 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { Scale, MessageCircle, FileText, User, Chrome as Home, Building2, Users, Settings } from 'lucide-react-native';
+import { Home, Briefcase, MessageCircle, User, Users } from 'lucide-react-native';
+
+const PRIMARY_COLOR = '#667eea';
+const SECONDARY_COLOR = '#764ba2';
+const GREY_COLOR = '#A0AEC0';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#1E40AF',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: PRIMARY_COLOR,
+        tabBarInactiveTintColor: GREY_COLOR,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 68,
+          borderTopColor: '#E2E8F0',
+          height: 60,
+          paddingBottom: 10,
+          paddingTop: 5,
         },
         tabBarLabelStyle: {
-          fontFamily: 'Inter-Medium',
           fontSize: 12,
-          marginTop: 4,
+          fontWeight: '600',
         },
+        headerShown: false,
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Início',
-          tabBarIcon: ({ size, color }) => (
-            <Home size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="legal-intake"
-        options={{
-          title: 'Consulta',
-          tabBarIcon: ({ size, color }) => (
-            <Scale size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Home size={focused ? 26 : 24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="cases"
         options={{
-          title: 'Casos',
-          tabBarIcon: ({ size, color }) => (
-            <FileText size={size} color={color} />
+          title: 'Meus Casos',
+          tabBarIcon: ({ color, focused }) => (
+            <Briefcase size={focused ? 26 : 24} color={color} />
           ),
         }}
       />
@@ -53,18 +48,64 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ size, color }) => (
-            <MessageCircle size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MessageCircle size={focused ? 26 : 24} color={color} />
           ),
+          tabBarBadge: 3,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ size, color }) => (
-            <User size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <User size={focused ? 26 : 24} color={color} />
           ),
+        }}
+      />
+       <Tabs.Screen
+        name="advogados"
+        options={{
+          title: 'Advogados',
+          tabBarIcon: ({ color, focused }) => (
+            <Users size={focused ? 26 : 24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="lawyer-details"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="video-consultation"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="legal-intake"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="cases/CaseDetail"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="cases/CaseDocuments"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="cases/MyCasesList"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
