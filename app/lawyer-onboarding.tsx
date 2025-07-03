@@ -1,16 +1,12 @@
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
-import { Camera, CheckCircle, ChevronLeft, ChevronRight, DollarSign, FileText, MapPin, User, Mail, Phone, Shield, Scale, Award, Briefcase, Building2, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import LocationService, { AddressDetails } from '@/components/LocationService';
+import { User, Scale, FileText, Shield, CircleCheck as CheckCircle, ArrowRight, Camera, MapPin, Award, Briefcase } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import { LawyerService } from '@/lib/supabase';
+import { router } from 'expo-router';
 
 export default function LawyerOnboardingScreen() {
   const [step, setStep] = useState(1);
-  const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     // Personal Data
     fullName: '',
@@ -45,14 +41,6 @@ export default function LawyerOnboardingScreen() {
     acceptedTerms: false,
     acceptedContract: false,
     acceptedEthics: false,
-    documents: {
-      oab: null,
-      identity: null,
-      residence: null,
-      cv: null,
-    },
-    lat: null as number | null,
-    lng: null as number | null,
   });
 
   const totalSteps = 6;
@@ -84,89 +72,14 @@ export default function LawyerOnboardingScreen() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (formData.lat === null || formData.lng === null) {
-      Alert.alert(
-        "Localização Necessária",
-        "Por favor, use o botão 'Usar minha localização atual' para definir o endereço do seu escritório antes de continuar."
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Mapear dados do formulário para o formato da tabela 'lawyers'
-      const lawyerData = {
-        name: formData.fullName,
-        oab_number: `${formData.oabState} ${formData.oabNumber}`,
-        primary_area: formData.specialties[0] || 'Não especificada', // Usa a primeira como principal
-        specialties: formData.specialties,
-        experience: parseInt(formData.experience, 10) || 0,
-        lat: formData.lat,
-        lng: formData.lng,
-        consultation_fee: parseFloat(formData.consultationFee) || 0,
-        hourly_rate: parseFloat(formData.hourlyRate) || 0,
-        languages: ['Português'], // Valor padrão
-        consultation_types: ['chat', 'video'], // Valor padrão
-        // Outros campos podem ser adicionados aqui
-      };
-
-      const { data, error } = await LawyerService.createLawyer(lawyerData);
-
-      if (error) {
-        throw new Error(error.message || 'Erro desconhecido ao criar advogado.');
-      }
-
-      Alert.alert(
-        'Solicitação Enviada',
-        'Seu cadastro foi enviado para análise. Você receberá um e-mail com o resultado em até 48 horas.',
-        [
-          { text: 'Entendi', onPress: () => router.replace('/(tabs)') }
-        ]
-      );
-
-    } catch (error: any) {
-      console.error("Erro no envio:", error);
-      Alert.alert("Erro no Cadastro", error.message || "Não foi possível concluir seu cadastro. Tente novamente.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUseCurrentLocation = async () => {
-    setIsGeocoding(true);
-    try {
-      const location = await LocationService.getCurrentLocation();
-      if (location) {
-        setFormData(prev => ({ ...prev, lat: location.latitude, lng: location.longitude }));
-        
-        const addressString = await LocationService.getAddressFromCoordinates(location.latitude, location.longitude);
-        
-        if (addressString) {
-          setFormData(prev => ({
-            ...prev,
-            address: addressString,
-            lat: location.latitude,
-            lng: location.longitude,
-          }));
-        } else {
-          // Apenas salva as coordenadas se não conseguir obter o endereço
-          setFormData(prev => ({
-            ...prev,
-            lat: location.latitude,
-            lng: location.longitude,
-          }));
-          Alert.alert("Coordenadas obtidas", "Localização capturada com sucesso. Por favor, preencha o endereço manualmente.");
-        }
-      } else {
-        Alert.alert("Localização não encontrada", "Não foi possível obter sua localização. Verifique as permissões do aplicativo e tente novamente.");
-      }
-    } catch (error) {
-      console.error("Erro ao usar localização:", error);
-      Alert.alert("Erro", "Ocorreu um erro ao buscar sua localização.");
-    } finally {
-      setIsGeocoding(false);
-    }
+  const handleSubmit = () => {
+    Alert.alert(
+      'Solicitação Enviada',
+      'Sua solicitação de cadastro foi enviada para análise. Você receberá um e-mail com o resultado em até 48 horas.',
+      [
+        { text: 'Entendi', onPress: () => router.replace('/(tabs)') }
+      ]
+    );
   };
 
   const toggleSpecialty = (specialty: string) => {
@@ -373,17 +286,6 @@ export default function LawyerOnboardingScreen() {
             <Text style={styles.stepDescription}>
               Defina seus honorários e endereço profissional
             </Text>
-
-            <TouchableOpacity 
-              style={styles.locationButton} 
-              onPress={handleUseCurrentLocation}
-              disabled={isGeocoding}
-            >
-              <MapPin size={18} color="#FFFFFF" />
-              <Text style={styles.locationButtonText}>
-                {isGeocoding ? 'Buscando...' : 'Usar minha localização atual'}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.inputContainer}>
               <DollarSign size={20} color="#6B7280" />
@@ -686,23 +588,23 @@ export default function LawyerOnboardingScreen() {
           </TouchableOpacity>
         )}
         
-        <TouchableOpacity 
-          style={styles.button}
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            step === 1 && styles.nextButtonFull,
+            (step === 6 && (!formData.acceptedTerms || !formData.acceptedContract || !formData.acceptedEthics)) && styles.nextButtonDisabled
+          ]}
           onPress={handleNext}
-          disabled={isSubmitting || isGeocoding}
+          disabled={step === 6 && (!formData.acceptedTerms || !formData.acceptedContract || !formData.acceptedEthics)}
         >
           <LinearGradient
-            colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : ['#3B82F6', '#1E40AF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.buttonGradient}
+            colors={['#7C3AED', '#8B5CF6']}
+            style={styles.nextButtonGradient}
           >
-            <Text style={styles.buttonText}>
-              {isSubmitting 
-                ? 'Enviando...' 
-                : (step === totalSteps ? 'Enviar Solicitação' : 'Continuar')}
+            <Text style={styles.nextButtonText}>
+              {step === totalSteps ? 'Enviar Solicitação' : 'Continuar'}
             </Text>
-            {!isSubmitting && <ChevronRight size={20} color="#FFFFFF" />}
+            <ArrowRight size={20} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -751,9 +653,10 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressText: {
-    color: '#374151',
+    fontFamily: 'Inter-Medium',
     fontSize: 14,
-    fontWeight: '500',
+    color: '#E0E7FF',
+    marginTop: 8,
   },
   content: {
     flex: 1,
@@ -761,8 +664,6 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   stepContent: {
-    flex: 1,
-    padding: 24,
     marginBottom: 100,
   },
   stepTitle: {
@@ -992,41 +893,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4B5563',
   },
-  button: {
-    marginTop: 20,
+  nextButton: {
+    flex: 2,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  buttonGradient: {
+  nextButtonFull: {
+    flex: 1,
+  },
+  nextButtonDisabled: {
+    opacity: 0.5,
+  },
+  nextButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 32,
     gap: 8,
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  buttonDisabled: {
-    backgroundColor: '#9CA3AF', // Cinza para desabilitado
-  },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E40AF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginBottom: 20,
-    gap: 8,
-  },
-  locationButtonText: {
-    color: '#FFFFFF',
+  nextButtonText: {
+    fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

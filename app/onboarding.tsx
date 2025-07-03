@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Building2, Mail, Phone, MapPin, FileText, Shield, CircleCheck as CheckCircle, ArrowRight, Camera, Calendar } from 'lucide-react-native';
+import { User, Building2, Mail, Phone, MapPin, FileText, Shield, CircleCheck as CheckCircle, ArrowRight, Camera } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 

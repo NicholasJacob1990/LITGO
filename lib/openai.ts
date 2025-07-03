@@ -19,6 +19,180 @@ export type AnalysisResponse = {
 
 type TriageResponse = InteractionResponse | AnalysisResponse;
 
+// Tipos para análise de currículo
+export interface CVAnalysisResult {
+  personalInfo: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    linkedin?: string;
+    website?: string;
+  };
+  professionalSummary: string;
+  education: Array<{
+    degree: string;
+    institution: string;
+    year?: number;
+    location?: string;
+  }>;
+  experience: Array<{
+    position: string;
+    company: string;
+    startDate: string;
+    endDate?: string;
+    description: string;
+    achievements?: string[];
+  }>;
+  skills: string[];
+  certifications: Array<{
+    name: string;
+    issuer: string;
+    year?: number;
+  }>;
+  languages: string[];
+  practiceAreas: string[];
+  oabNumber?: string;
+  barAssociations: string[];
+  awards: string[];
+  publications: string[];
+  totalExperience: number;
+  specializationYears: Record<string, number>;
+  consultationFee?: number;
+  hourlyRate?: number;
+  availabilitySchedule?: string;
+  emergencyAvailability?: boolean;
+  consultationMethods: string[];
+}
+
+export async function analyzeLawyerCV(cvText: string): Promise<CVAnalysisResult> {
+  if (!API_KEY) {
+    throw new Error("API key da OpenAI não configurada");
+  }
+
+  const systemMessage: ChatGPTMessage = {
+    role: 'system',
+    content: `
+# PERSONA
+Você é um especialista em análise de currículos jurídicos brasileiros, com conhecimento profundo sobre a carreira advocatícia no Brasil.
+
+# TAREFA
+Analisar o currículo fornecido e extrair informações estruturadas sobre o advogado para criar um perfil profissional completo.
+
+# INSTRUÇÕES
+1. Extraia todas as informações relevantes do currículo
+2. Identifique áreas de especialização e anos de experiência em cada uma
+3. Calcule o tempo total de experiência profissional
+4. Identifique competências técnicas e soft skills
+5. Extraia informações sobre formação acadêmica e certificações
+6. Identifique publicações, prêmios e reconhecimentos
+7. Determine métodos de consulta preferidos (se mencionado)
+8. Estime valores de consulta baseado na experiência (se não informado)
+
+# FORMATO DE RESPOSTA
+Retorne APENAS um JSON válido seguindo exatamente esta estrutura:
+
+{
+  "personalInfo": {
+    "name": "Nome completo extraído",
+    "email": "email@exemplo.com ou null",
+    "phone": "telefone ou null",
+    "address": "endereço ou null", 
+    "linkedin": "perfil linkedin ou null",
+    "website": "site pessoal ou null"
+  },
+  "professionalSummary": "Resumo profissional em 2-3 frases",
+  "education": [
+    {
+      "degree": "Título do curso",
+      "institution": "Nome da instituição",
+      "year": 2020,
+      "location": "Cidade, UF"
+    }
+  ],
+  "experience": [
+    {
+      "position": "Cargo",
+      "company": "Nome da empresa/escritório",
+      "startDate": "MM/YYYY",
+      "endDate": "MM/YYYY ou null se atual",
+      "description": "Descrição das atividades",
+      "achievements": ["Conquista 1", "Conquista 2"]
+    }
+  ],
+  "skills": ["Habilidade 1", "Habilidade 2"],
+  "certifications": [
+    {
+      "name": "Nome da certificação",
+      "issuer": "Instituição emissora",
+      "year": 2021
+    }
+  ],
+  "languages": ["Português", "Inglês"],
+  "practiceAreas": ["Direito Civil", "Direito Trabalhista"],
+  "oabNumber": "OAB/UF 123456 ou null",
+  "barAssociations": ["OAB/SP", "IAB"],
+  "awards": ["Prêmio 1", "Prêmio 2"],
+  "publications": ["Artigo 1", "Livro 1"],
+  "totalExperience": 8,
+  "specializationYears": {
+    "Direito Civil": 5,
+    "Direito Trabalhista": 3
+  },
+  "consultationFee": 200,
+  "hourlyRate": 400,
+  "availabilitySchedule": "Segunda a sexta, 9h às 18h",
+  "emergencyAvailability": false,
+  "consultationMethods": ["presencial", "online", "telefone"]
+}
+
+# REGRAS IMPORTANTES
+- Se uma informação não estiver disponível, use null
+- Anos de experiência devem ser calculados com base nas datas
+- Áreas de prática devem usar terminologia jurídica brasileira padrão
+- Valores de consulta devem ser estimados baseado na experiência se não informados
+- Sempre retorne JSON válido
+- Não inclua comentários ou texto adicional
+`
+  };
+
+  const userMessage: ChatGPTMessage = {
+    role: 'user',
+    content: `Analise este currículo e extraia as informações estruturadas:\n\n${cvText}`
+  };
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [systemMessage, userMessage],
+        temperature: 0.3,
+        max_tokens: 4096,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.choices[0].message.content;
+    const analysisResult: CVAnalysisResult = JSON.parse(responseText);
+
+    return analysisResult;
+    
+  } catch (error) {
+    console.error("❌ ERRO na análise de CV:", error);
+    throw new Error("Erro ao analisar currículo. Tente novamente.");
+  }
+}
+
 export async function generateTriageAnalysis(
   history: ChatGPTMessage[]
 ): Promise<TriageResponse> {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } fr
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { ArrowLeft, MessageCircle, Video, Phone, FileText, Calendar, DollarSign, AlertTriangle } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import { mockCases } from './MyCasesList';
+import { mockCases, mockDetailedData } from './MyCasesList';
 import PreAnalysisCard from '@/components/organisms/PreAnalysisCard';
 import CaseCard from '@/components/organisms/CaseCard';
 import CostRiskCard from '@/components/organisms/CostRiskCard';
@@ -14,87 +14,6 @@ import Badge from '@/components/atoms/Badge';
 import ProgressBar from '@/components/atoms/ProgressBar';
 import MoneyTile from '@/components/atoms/MoneyTile';
 import StepItem from '@/components/molecules/StepItem';
-
-// Sample detailed data
-const mockDetailedData = {
-  '001': {
-    preAnalysis: {
-      caseTitle: 'Rescisão Trabalhista',
-      analysisDate: '2024-01-15T10:30:00Z',
-      confidence: 92,
-      estimatedCost: 3500,
-      riskLevel: 'medium' as const,
-      keyPoints: [
-        'Demissão sem justa causa comprovada',
-        'Direito a todas as verbas rescisórias',
-        'Possível indenização adicional por danos morais',
-        'Documentação trabalhista completa',
-        'Prazo para ação ainda válido'
-      ]
-    },
-    consultInfo: {
-      scheduledDate: '2024-01-22T14:00:00Z',
-      duration: '45 minutos',
-      type: 'Consulta Presencial',
-      plan: 'Premium'
-    },
-    steps: [
-      {
-        title: 'Análise de Documentos',
-        description: 'Revisão completa da documentação trabalhista',
-        status: 'completed' as const,
-        priority: 8,
-        dueDate: '2024-01-16'
-      },
-      {
-        title: 'Cálculo de Verbas',
-        description: 'Cálculo detalhado das verbas rescisórias devidas',
-        status: 'active' as const,
-        priority: 9,
-        dueDate: '2024-01-20'
-      },
-      {
-        title: 'Notificação Extrajudicial',
-        description: 'Envio de notificação para tentativa de acordo',
-        status: 'pending' as const,
-        priority: 7,
-        dueDate: '2024-01-25'
-      }
-    ],
-    documents: [
-      { 
-        id: 'doc1', 
-        name: 'Carteira de Trabalho.pdf', 
-        size: 2048576, 
-        uploadedAt: '2024-01-15T10:30:00Z' 
-      },
-      { 
-        id: 'doc2', 
-        name: 'Contrato de Trabalho.pdf', 
-        size: 1536000, 
-        uploadedAt: '2024-01-15T11:45:00Z' 
-      },
-      { 
-        id: 'doc3', 
-        name: 'Comprovantes de Pagamento.pdf', 
-        size: 3072000, 
-        uploadedAt: '2024-01-16T09:20:00Z' 
-      },
-      { 
-        id: 'doc4', 
-        name: 'Termo de Rescisão.pdf', 
-        size: 1024000, 
-        uploadedAt: '2024-01-16T14:10:00Z' 
-      }
-    ],
-    costs: {
-      consultationFee: 300,
-      legalFees: 2500,
-      courtCosts: 450,
-      totalEstimate: 3250
-    }
-  }
-};
 
 export default function CaseDetail() {
   const route = useRoute<any>();
@@ -259,10 +178,31 @@ export default function CaseDetail() {
           </View>
         )}
 
-        {/* Documents List */}
+        {/* Documents Summary Card */}
         {detailedData?.documents && (
           <View style={styles.section}>
-            <DocumentsList files={detailedData.documents} />
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Documentos</Text>
+                <Badge 
+                  label={detailedData.documents.length.toString()} 
+                  intent="neutral" 
+                  size="small" 
+                />
+              </View>
+              
+              <Text style={styles.documentsCount}>
+                {detailedData.documents.length} documento(s) anexado(s)
+              </Text>
+              
+              <TouchableOpacity 
+                style={styles.viewDocumentsButton}
+                onPress={() => navigation.navigate('CaseDocuments', { caseId })}
+              >
+                <FileText size={16} color="#006CFF" />
+                <Text style={styles.viewDocumentsText}>Gerenciar Documentos</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -443,6 +383,26 @@ const styles = StyleSheet.create({
   },
   stepsList: {
     marginTop: 8,
+  },
+  documentsCount: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  viewDocumentsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  viewDocumentsText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#006CFF',
   },
   documentsList: {
     gap: 12,

@@ -435,4 +435,207 @@ export async function getUserCases(userId: string) {
   }
 
   return data;
+}
+
+// CV Analysis Functions
+
+/**
+ * Salva a análise de CV no banco de dados
+ */
+export async function saveCVAnalysis(lawyerId: string, cvUrl: string, analysis: any) {
+  try {
+    const { data, error } = await supabase
+      .from('lawyers')
+      .update({
+        cv_url: cvUrl,
+        cv_analysis: analysis,
+        cv_processed_at: new Date().toISOString(),
+        // Atualizar campos do perfil com base na análise
+        name: analysis.personalInfo?.name || undefined,
+        email: analysis.personalInfo?.email || undefined,
+        phone: analysis.personalInfo?.phone || undefined,
+        bio: analysis.professionalSummary || undefined,
+        experience: analysis.totalExperience || 0,
+        education: analysis.education?.map((edu: any) => `${edu.degree} - ${edu.institution} (${edu.year || 'N/A'})`) || [],
+        certifications: analysis.certifications?.map((cert: any) => `${cert.name} - ${cert.issuer} (${cert.year || 'N/A'})`) || [],
+        professional_experience: analysis.experience?.map((exp: any) => 
+          `${exp.position} na ${exp.company} (${exp.startDate} - ${exp.endDate || 'Atual'}): ${exp.description}`
+        ) || [],
+        skills: analysis.skills || [],
+        languages: analysis.languages || ['Português'],
+        practice_areas: analysis.practiceAreas || [],
+        oab_number: analysis.oabNumber || undefined,
+        bar_associations: analysis.barAssociations || [],
+        awards: analysis.awards || [],
+        publications: analysis.publications || [],
+        specialization_years: analysis.specializationYears || {},
+        consultation_fee: analysis.consultationFee || 0,
+        hourly_rate: analysis.hourlyRate || 0,
+        availability_schedule: analysis.availabilitySchedule ? { description: analysis.availabilitySchedule } : undefined,
+        emergency_availability: analysis.emergencyAvailability || false,
+        consultation_methods: analysis.consultationMethods || ['online', 'presencial'],
+        professional_summary: analysis.professionalSummary || undefined,
+        website: analysis.personalInfo?.website || undefined,
+        linkedin: analysis.personalInfo?.linkedin || undefined,
+        office_address: analysis.personalInfo?.address || undefined,
+        // Calcular porcentagem de completude do perfil
+        profile_completion_percentage: null, // Será calculado pelo trigger
+        profile_updated_at: new Date().toISOString()
+      })
+      .eq('id', lawyerId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao salvar análise de CV:', error);
+      throw new Error('Erro ao salvar análise de CV no banco de dados');
+    }
+
+    // Calcular porcentagem de completude
+    const { data: completionData, error: completionError } = await supabase
+      .rpc('calculate_profile_completion', { lawyer_id: lawyerId });
+
+    if (!completionError && completionData !== null) {
+      await supabase
+        .from('lawyers')
+        .update({ profile_completion_percentage: completionData })
+        .eq('id', lawyerId);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao salvar análise de CV:', error);
+    throw error;
+  }
+}
+
+/**
+ * Busca análise de CV de um advogado
+ */
+export async function getCVAnalysis(lawyerId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('lawyers')
+      .select('cv_url, cv_analysis, cv_processed_at')
+      .eq('id', lawyerId)
+      .single();
+
+    if (error) {
+      console.error('Erro ao buscar análise de CV:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar análise de CV:', error);
+    return null;
+  }
+}
+
+/**
+ * Atualiza perfil do advogado baseado na análise de CV
+ */
+export async function updateLawyerProfileFromCV(lawyerId: string, cvAnalysis: any) {
+  try {
+    const updateData: any = {};
+
+    // Mapear dados da análise para os campos do banco
+    if (cvAnalysis.personalInfo) {
+      if (cvAnalysis.personalInfo.name) updateData.name = cvAnalysis.personalInfo.name;
+      if (cvAnalysis.personalInfo.email) updateData.email = cvAnalysis.personalInfo.email;
+      if (cvAnalysis.personalInfo.phone) updateData.phone = cvAnalysis.personalInfo.phone;
+      if (cvAnalysis.personalInfo.website) updateData.website = cvAnalysis.personalInfo.website;
+      if (cvAnalysis.personalInfo.linkedin) updateData.linkedin = cvAnalysis.personalInfo.linkedin;
+      if (cvAnalysis.personalInfo.address) updateData.office_address = cvAnalysis.personalInfo.address;
+    }
+
+    if (cvAnalysis.professionalSummary) {
+      updateData.bio = cvAnalysis.professionalSummary;
+      updateData.professional_summary = cvAnalysis.professionalSummary;
+    }
+
+    if (cvAnalysis.totalExperience) updateData.experience = cvAnalysis.totalExperience;
+    if (cvAnalysis.oabNumber) updateData.oab_number = cvAnalysis.oabNumber;
+    if (cvAnalysis.consultationFee) updateData.consultation_fee = cvAnalysis.consultationFee;
+    if (cvAnalysis.hourlyRate) updateData.hourly_rate = cvAnalysis.hourlyRate;
+    if (cvAnalysis.emergencyAvailability !== undefined) updateData.emergency_availability = cvAnalysis.emergencyAvailability;
+
+    // Arrays
+    if (cvAnalysis.skills) updateData.skills = cvAnalysis.skills;
+    if (cvAnalysis.languages) updateData.languages = cvAnalysis.languages;
+    if (cvAnalysis.practiceAreas) updateData.practice_areas = cvAnalysis.practiceAreas;
+    if (cvAnalysis.barAssociations) updateData.bar_associations = cvAnalysis.barAssociations;
+    if (cvAnalysis.awards) updateData.awards = cvAnalysis.awards;
+    if (cvAnalysis.publications) updateData.publications = cvAnalysis.publications;
+    if (cvAnalysis.consultationMethods) updateData.consultation_methods = cvAnalysis.consultationMethods;
+
+    // Processar educação
+    if (cvAnalysis.education) {
+      updateData.education = cvAnalysis.education.map((edu: any) => 
+        `${edu.degree} - ${edu.institution} (${edu.year || 'N/A'})`
+      );
+    }
+
+    // Processar certificações
+    if (cvAnalysis.certifications) {
+      updateData.certifications = cvAnalysis.certifications.map((cert: any) => 
+        `${cert.name} - ${cert.issuer} (${cert.year || 'N/A'})`
+      );
+    }
+
+    // Processar experiência profissional
+    if (cvAnalysis.experience) {
+      updateData.professional_experience = cvAnalysis.experience.map((exp: any) => 
+        `${exp.position} na ${exp.company} (${exp.startDate} - ${exp.endDate || 'Atual'}): ${exp.description}`
+      );
+    }
+
+    // JSON fields
+    if (cvAnalysis.specializationYears) updateData.specialization_years = cvAnalysis.specializationYears;
+    if (cvAnalysis.availabilitySchedule) {
+      updateData.availability_schedule = { description: cvAnalysis.availabilitySchedule };
+    }
+
+    updateData.profile_updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('lawyers')
+      .update(updateData)
+      .eq('id', lawyerId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar perfil do advogado:', error);
+      throw new Error('Erro ao atualizar perfil do advogado');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Erro ao atualizar perfil do advogado:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verifica se o advogado tem CV processado
+ */
+export async function hasProcessedCV(lawyerId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('lawyers')
+      .select('cv_processed_at')
+      .eq('id', lawyerId)
+      .single();
+
+    if (error) {
+      console.error('Erro ao verificar CV processado:', error);
+      return false;
+    }
+
+    return data?.cv_processed_at !== null;
+  } catch (error) {
+    console.error('Erro ao verificar CV processado:', error);
+    return false;
+  }
 } 

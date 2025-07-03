@@ -1,65 +1,258 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bot, ArrowRight, LogOut } from 'lucide-react-native';
+import { Scale, Clock, Shield, Users, TrendingUp, Star, Bot, FileText, MessageCircle, Building2, UserCheck, Briefcase } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import supabase from '@/lib/supabase';
-import { User } from '@supabase/supabase-js';
 
 export default function HomeScreen() {
-  const [user, setUser] = useState<User | null>(null);
-  
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    }
-    fetchUser();
-  }, []);
+  const stats = [
+    { icon: Users, label: 'Advogados Ativos', value: '1.2K+' },
+    { icon: TrendingUp, label: 'Casos Resolvidos', value: '25K+' },
+    { icon: Star, label: 'Avaliação Média', value: '4.9' },
+  ];
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    // The router.replace will be handled by the root _layout.tsx
-  };
-  
-  const displayName = user?.user_metadata?.full_name || user?.email;
+  const services = [
+    {
+      title: 'Direito Trabalhista',
+      description: 'Demissões, rescisões e direitos trabalhistas',
+      color: '#059669',
+      icon: Scale,
+      cases: '8.5K',
+    },
+    {
+      title: 'Direito Empresarial',
+      description: 'Contratos, sociedades e compliance',
+      color: '#7C3AED',
+      icon: Building2,
+      cases: '6.2K',
+    },
+    {
+      title: 'Direito Civil',
+      description: 'Contratos, responsabilidade civil e família',
+      color: '#DC2626',
+      icon: FileText,
+      cases: '4.8K',
+    },
+    {
+      title: 'Direito do Consumidor',
+      description: 'Defesa e proteção dos direitos do consumidor',
+      color: '#F59E0B',
+      icon: Shield,
+      cases: '3.1K',
+    },
+  ];
+
+  const recentActivity = [
+    {
+      id: '1',
+      type: 'ai_summary',
+      title: 'Pré-análise IA Concluída',
+      description: 'Caso #2024-0156 - Questão Previdenciária',
+      time: '15 min atrás',
+      icon: Bot,
+      color: '#7C3AED',
+    },
+    {
+      id: '2',
+      type: 'lawyer_assigned',
+      title: 'Advogado Designado',
+      description: 'Dr. Carlos Mendes - Caso #2024-0155',
+      time: '1 hora atrás',
+      icon: UserCheck,
+      color: '#059669',
+    },
+    {
+      id: '3',
+      type: 'case_completed',
+      title: 'Caso Finalizado',
+      description: 'Revisão Contratual - Cliente satisfeito',
+      time: '3 horas atrás',
+      icon: FileText,
+      color: '#1E40AF',
+    },
+  ];
+
+  const quickActions = [
+    {
+      title: 'Pessoa Física',
+      subtitle: 'Consulta individual',
+      icon: Users,
+      color: '#1E40AF',
+      action: () => router.push('/onboarding?type=PF'),
+    },
+    {
+      title: 'Pessoa Jurídica',
+      subtitle: 'Consulta empresarial',
+      icon: Building2,
+      color: '#059669',
+      action: () => router.push('/onboarding?type=PJ'),
+    },
+    {
+      title: 'Seja Advogado',
+      subtitle: 'Junte-se à nossa rede',
+      icon: Briefcase,
+      color: '#7C3AED',
+      action: () => router.push('/lawyer-onboarding'),
+    },
+  ];
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      
       <LinearGradient
-        colors={['#1F2937', '#111827']}
-        style={styles.background}
-      />
-      <View style={styles.header}>
-        <View>
-            {displayName && <Text style={styles.welcomeText}>Olá, {displayName.split(' ')[0]}</Text>}
+        colors={['#1E40AF', '#3B82F6']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.greeting}>Bem-vindo ao</Text>
+          <Text style={styles.logo}>LegalTech Pro</Text>
+          <Text style={styles.subtitle}>
+            Conectando você aos melhores advogados do Brasil
+          </Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <LogOut size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.content}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Plataforma Oficial</Text>
+      </LinearGradient>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Stats Section */}
+        <View style={styles.statsContainer}>
+          {stats.map((stat, index) => (
+            <View key={index} style={styles.statCard}>
+              <stat.icon size={24} color="#1E40AF" />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
         </View>
-        <Text style={styles.title}>
-          Seu Problema Jurídico, Resolvido com Inteligência
-        </Text>
-        <Text style={styles.subtitle}>
-          Use nossa IA para uma pré-análise gratuita e seja conectado ao advogado certo para o seu caso.
-        </Text>
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => router.push('/NewCase')}
-          activeOpacity={0.8}
-        >
-          <Bot size={24} color="#1F2937" />
-          <Text style={styles.ctaButtonText}>Iniciar Consulta com IA</Text>
-          <ArrowRight size={24} color="#1F2937" />
-        </TouchableOpacity>
-      </View>
+
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Como podemos ajudar?</Text>
+          
+          <View style={styles.quickActionsGrid}>
+            {quickActions.map((action, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.quickActionCard}
+                onPress={action.action}
+              >
+                <LinearGradient
+                  colors={[action.color, `${action.color}CC`]}
+                  style={styles.quickActionGradient}
+                >
+                  <action.icon size={28} color="#FFFFFF" />
+                  <Text style={styles.quickActionTitle}>{action.title}</Text>
+                  <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* AI-Powered Features */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tecnologia Avançada</Text>
+          
+          <View style={styles.aiFeatureCard}>
+            <LinearGradient
+              colors={['#7C3AED', '#8B5CF6']}
+              style={styles.aiFeatureGradient}
+            >
+              <Bot size={32} color="#FFFFFF" />
+              <View style={styles.aiFeatureContent}>
+                <Text style={styles.aiFeatureTitle}>Análise Jurídica com IA</Text>
+                <Text style={styles.aiFeatureDescription}>
+                  Nossa inteligência artificial analisa seu caso em segundos e gera uma 
+                  pré-análise que é compartilhada simultaneamente com você e o advogado 
+                  designado, agilizando todo o processo.
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Recent Activity */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Atividade Recente</Text>
+          
+          {recentActivity.map((activity) => (
+            <TouchableOpacity key={activity.id} style={styles.activityCard}>
+              <View style={[styles.activityIcon, { backgroundColor: `${activity.color}15` }]}>
+                <activity.icon size={20} color={activity.color} />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>{activity.title}</Text>
+                <Text style={styles.activityDescription}>{activity.description}</Text>
+                <Text style={styles.activityTime}>{activity.time}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Services Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Áreas de Atuação</Text>
+          
+          {services.map((service, index) => (
+            <TouchableOpacity key={index} style={styles.serviceCard}>
+              <View style={[styles.serviceIcon, { backgroundColor: `${service.color}15` }]}>
+                <service.icon size={20} color={service.color} />
+              </View>
+              <View style={styles.serviceContent}>
+                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.serviceDescription}>{service.description}</Text>
+                <Text style={styles.serviceCases}>{service.cases} casos resolvidos</Text>
+              </View>
+              <View style={[styles.serviceIndicator, { backgroundColor: service.color }]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Testimonial */}
+        <View style={styles.testimonialCard}>
+          <View style={styles.testimonialHeader}>
+            <Image 
+              source={{ uri: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=400' }}
+              style={styles.testimonialAvatar}
+            />
+            <View>
+              <Text style={styles.testimonialName}>Maria Silva</Text>
+              <Text style={styles.testimonialRole}>Empresária - São Paulo</Text>
+              <View style={styles.testimonialRating}>
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={16} color="#F59E0B" fill="#F59E0B" />
+                ))}
+              </View>
+            </View>
+          </View>
+          <Text style={styles.testimonialText}>
+            "A pré-análise por IA me ajudou a entender meu caso antes mesmo de falar com o advogado. 
+            Quando chegou a consulta, já tínhamos uma base sólida para trabalhar. Processo muito eficiente!"
+          </Text>
+        </View>
+
+        {/* Trust Indicators */}
+        <View style={styles.trustSection}>
+          <Text style={styles.trustTitle}>Segurança e Compliance</Text>
+          <View style={styles.trustGrid}>
+            <View style={styles.trustItem}>
+              <Shield size={24} color="#059669" />
+              <Text style={styles.trustLabel}>LGPD</Text>
+              <Text style={styles.trustSubtext}>Compliant</Text>
+            </View>
+            <View style={styles.trustItem}>
+              <Scale size={24} color="#059669" />
+              <Text style={styles.trustLabel}>OAB</Text>
+              <Text style={styles.trustSubtext}>Regulamentado</Text>
+            </View>
+            <View style={styles.trustItem}>
+              <Lock size={24} color="#059669" />
+              <Text style={styles.trustLabel}>SSL</Text>
+              <Text style={styles.trustSubtext}>Criptografado</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -67,89 +260,313 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  background: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '100%',
+    backgroundColor: '#F8FAFC',
   },
   header: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
+    paddingTop: 60,
+    paddingBottom: 32,
     paddingHorizontal: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  },
+  headerContent: {
     alignItems: 'center',
   },
-  welcomeText: {
-      color: '#FFFFFF',
-      fontSize: 18,
-      fontWeight: 'bold',
+  greeting: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#E0E7FF',
+    marginBottom: 4,
   },
-  logoutButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 50,
+  logo: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 32,
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#E0E7FF',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: -16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: '#F8FAFC',
     paddingHorizontal: 24,
   },
-  badge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 50,
-    marginBottom: 24,
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 32,
   },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#FFFFFF',
+  statValue: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 20,
+    color: '#1F2937',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
     textAlign: 'center',
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 20,
+    color: '#1F2937',
     marginBottom: 16,
   },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    marginBottom: 40,
-    lineHeight: 25,
+  quickActionsGrid: {
+    gap: 16,
   },
-  ctaButton: {
+  quickActionCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  quickActionGradient: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  quickActionTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#FFFFFF',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  quickActionSubtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  aiFeatureCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  aiFeatureGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 50,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
+    padding: 20,
   },
-  ctaButtonText: {
-    color: '#1F2937',
+  aiFeatureContent: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  aiFeatureTitle: {
+    fontFamily: 'Inter-SemiBold',
     fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 12,
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  aiFeatureDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#E0E7FF',
+    lineHeight: 20,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  activityDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  activityTime: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  serviceCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    position: 'relative',
+  },
+  serviceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  serviceContent: {
+    flex: 1,
+  },
+  serviceTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  serviceDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  serviceCases: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: '#059669',
+  },
+  serviceIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  testimonialCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  testimonialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  testimonialAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  testimonialName: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  testimonialRole: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  testimonialRating: {
+    flexDirection: 'row',
+  },
+  testimonialText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 15,
+    color: '#4B5563',
+    lineHeight: 22,
+    fontStyle: 'italic',
+  },
+  trustSection: {
+    marginBottom: 32,
+  },
+  trustTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1F2937',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  trustGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  trustItem: {
+    alignItems: 'center',
+  },
+  trustLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#1F2937',
+    marginTop: 8,
+  },
+  trustSubtext: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: '#059669',
+    marginTop: 2,
   },
 });

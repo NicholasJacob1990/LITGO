@@ -6,12 +6,13 @@ import { useNavigation } from '@react-navigation/native';
 
 interface TopBarProps {
   title: string;
+  subtitle?: string;
   showBack?: boolean;
   showShare?: boolean;
   onShare?: () => void;
 }
 
-export default function TopBar({ title, showBack = false, showShare = false, onShare }: TopBarProps) {
+export default function TopBar({ title, subtitle, showBack = false, showShare = false, onShare }: TopBarProps) {
   const navigation = useNavigation();
 
   const handleBack = () => {
@@ -39,7 +40,10 @@ export default function TopBar({ title, showBack = false, showShare = false, onS
             )}
           </View>
           
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
           
           <View style={styles.rightSection}>
             {showShare && (
@@ -78,12 +82,23 @@ const styles = StyleSheet.create({
     width: 44,
     alignItems: 'flex-end',
   },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 18,
     color: '#FFFFFF',
     textAlign: 'center',
-    flex: 1,
+  },
+  subtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginTop: 2,
   },
   iconButton: {
     padding: 8,

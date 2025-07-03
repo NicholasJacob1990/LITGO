@@ -1,8 +1,7 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
 import { useState } from 'react';
-import { Send, Paperclip, Video, Phone, MoveVertical as MoreVertical, CheckCheck, Star, FileText } from 'lucide-react-native';
+import { Send, Paperclip, Video, Phone, MoveVertical as MoreVertical, CheckCheck } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
 
 export default function ChatScreen() {
   const [message, setMessage] = useState('');
@@ -49,11 +48,7 @@ export default function ChatScreen() {
     specialty: 'Direito Trabalhista',
     avatar: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=400',
     online: true,
-    rating: '4.5',
-    experience: '10',
   };
-
-  const router = useRouter();
 
   const sendMessage = () => {
     if (!message.trim()) return;
@@ -88,27 +83,6 @@ export default function ChatScreen() {
     }, 2000);
   };
 
-  const handleVideoCall = () => {
-    Alert.alert(
-      'Iniciar Vídeo',
-      'Deseja iniciar uma consulta por vídeo?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Iniciar', 
-          onPress: () => router.push('/(tabs)/video-consultation')
-        }
-      ]
-    );
-  };
-
-  const handleViewCaseDetails = () => {
-    router.push({
-      pathname: '/(tabs)/case-details',
-      params: { caseId: 'case-001' }
-    });
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -135,31 +109,6 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
             <MoreVertical size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Lawyer Info */}
-      <View style={styles.lawyerInfo}>
-        <Image source={{ uri: lawyer.avatar }} style={styles.lawyerAvatar} />
-        
-        <View style={styles.lawyerDetails}>
-          <Text style={styles.lawyerName}>{lawyer.name}</Text>
-          <Text style={styles.lawyerSpecialty}>{lawyer.specialty}</Text>
-          <View style={styles.lawyerStats}>
-            <Star size={14} color="#F59E0B" fill="#F59E0B" />
-            <Text style={styles.lawyerRating}>{lawyer.rating}</Text>
-            <Text style={styles.lawyerExperience}>{lawyer.experience} anos</Text>
-          </View>
-        </View>
-
-        <View style={styles.lawyerActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleVideoCall}>
-            <Video size={20} color="#059669" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleViewCaseDetails}>
-            <FileText size={20} color="#1E40AF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -421,42 +370,5 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#E5E7EB',
-  },
-  lawyerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 24,
-  },
-  lawyerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
-  },
-  lawyerDetails: {
-    flex: 1,
-  },
-  lawyerStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  lawyerRating: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#1F2937',
-    marginLeft: 4,
-  },
-  lawyerExperience: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-  lawyerActions: {
-    flexDirection: 'row',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 8,
   },
 });

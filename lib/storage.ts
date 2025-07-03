@@ -48,11 +48,67 @@ class StorageService {
     }
   }
 
+  async uploadFile(fileUri: string, bucket: string, userId: string, fileName: string): Promise<string> {
+    try {
+      // Ler o arquivo como ArrayBuffer
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        throw new Error('Arquivo não encontrado');
+      }
+
+      const fileContent = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+      const arrayBuffer = decodeBase64(`data:application/octet-stream;base64,${fileContent}`);
+      
+      const fileExt = this.getFileExtensionFromName(fileName);
+      const contentType = this.getContentType(fileExt);
+      const uploadFileName = `${userId}/${randomUUID()}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(uploadFileName, arrayBuffer, { contentType });
+
+      if (error) {
+        throw error;
+      }
+      
+      const { data } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(uploadFileName);
+
+      return data.publicUrl;
+
+    } catch (error) {
+      console.error('Erro no upload do arquivo:', error);
+      if (error instanceof Error) {
+        throw new Error(`Falha no upload do arquivo: ${error.message}`);
+      }
+      throw new Error('Falha no upload do arquivo devido a um erro desconhecido.');
+    }
+  }
+
   private getFileExtension(base64: string): string | null {
     if (base64.startsWith('data:image/jpeg')) return 'jpg';
     if (base64.startsWith('data:image/png')) return 'png';
     // Adicione outros tipos se necessário
     return 'jpg'; // fallback
+  }
+
+  private getFileExtensionFromName(fileName: string): string {
+    const parts = fileName.split('.');
+    return parts[parts.length - 1].toLowerCase();
+  }
+
+  private getContentType(extension: string): string {
+    const contentTypes: { [key: string]: string } = {
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+    };
+    return contentTypes[extension] || 'application/octet-stream';
   }
 }
 

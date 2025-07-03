@@ -5,8 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import supabase from '../../lib/supabase';
 import { Eye, EyeOff, UploadCloud, CheckCircle } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import storageService from '../../lib/storage';
 import locationService from '../../components/LocationService';
+import { extractTextFromFile } from '../../lib/downloadUtils';
+import { analyzeLawyerCV, CVAnalysisResult } from '../../lib/openai';
+import { saveCVAnalysis } from '../../lib/supabase';
 
 const TOTAL_STEPS = 4;
 
@@ -38,6 +42,9 @@ export default function RegisterLawyer() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [oabDocument, setOabDocument] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [proofOfAddress, setProofOfAddress] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [cvDocument, setCvDocument] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [cvAnalysis, setCvAnalysis] = useState<CVAnalysisResult | null>(null);
+  const [isProcessingCV, setIsProcessingCV] = useState(false);
 
   const [formData, setFormData] = useState({
     // Step 1
@@ -61,6 +68,7 @@ export default function RegisterLawyer() {
     // Step 3
     oabDocumentUrl: '',
     proofOfAddressUrl: '',
+    cvUrl: '',
   });
 
   const handleInputChange = (name: string, value: string) => {
@@ -121,12 +129,17 @@ export default function RegisterLawyer() {
       // Segundo, faz upload dos documentos
       let oabUrl = '';
       let addressUrl = '';
+      let cvUrl = '';
       try {
         if (oabDocument?.base64) {
             oabUrl = await storageService.uploadBase64Image(oabDocument.base64, 'lawyer-documents', user.id);
         }
         if (proofOfAddress?.base64) {
             addressUrl = await storageService.uploadBase64Image(proofOfAddress.base64, 'lawyer-documents', user.id);
+        }
+        if (cvDocument?.uri) {
+            // Para documentos PDF/TXT, usar upload direto do URI
+            cvUrl = await storageService.uploadFile(cvDocument.uri, 'lawyer-documents', user.id, cvDocument.name);
         }
       } catch (uploadError) {
           setLoading(false);
@@ -145,11 +158,22 @@ export default function RegisterLawyer() {
           specialties,
           oab_document_url: oabUrl,
           proof_of_address_url: addressUrl,
+          cv_url: cvUrl,
         }
       });
 
       if (updateError) {
         // ... (tratamento de erro, talvez tentar de novo ou avisar o suporte)
+      }
+
+      // Quarto, se há análise de CV, salvar no banco de dados
+      if (cvAnalysis && cvUrl) {
+        try {
+          await saveCVAnalysis(user.id, cvUrl, cvAnalysis);
+        } catch (cvError) {
+          console.error('Erro ao salvar análise de CV:', cvError);
+          // Não bloquear o cadastro por erro na análise de CV
+        }
       }
 
       setLoading(false);
@@ -186,6 +210,88 @@ export default function RegisterLawyer() {
 
     if (!result.canceled) {
       setter(result.assets[0]);
+    }
+  };
+
+  const handlePickCV = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        
+        // Verificar tamanho do arquivo (máximo 5MB)
+        if (file.size && file.size > 5 * 1024 * 1024) {
+          Alert.alert('Arquivo muito grande', 'O arquivo deve ter no máximo 5MB.');
+          return;
+        }
+
+        setCvDocument(file);
+        
+        // Processar CV automaticamente
+        await processCV(file);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar CV:', error);
+      Alert.alert('Erro', 'Erro ao selecionar arquivo de CV.');
+    }
+  };
+
+  const processCV = async (file: DocumentPicker.DocumentPickerAsset) => {
+    setIsProcessingCV(true);
+    setError(null);
+
+    try {
+      // Extrair texto do arquivo
+      const extractedText = await extractTextFromFile(file.uri, file.name);
+      
+      if (!extractedText || extractedText.trim().length < 100) {
+        throw new Error('Não foi possível extrair texto suficiente do CV. Verifique se o arquivo está legível.');
+      }
+
+      // Analisar CV com IA
+      const analysis = await analyzeLawyerCV(extractedText);
+      setCvAnalysis(analysis);
+
+      // Pré-preencher formulário com dados extraídos
+      if (analysis.personalInfo) {
+        const updates: any = {};
+        if (analysis.personalInfo.name && !formData.fullName) {
+          updates.fullName = analysis.personalInfo.name;
+        }
+        if (analysis.personalInfo.email && !formData.email) {
+          updates.email = analysis.personalInfo.email;
+        }
+        if (analysis.personalInfo.phone && !formData.phone) {
+          updates.phone = analysis.personalInfo.phone;
+        }
+        if (analysis.oabNumber && !formData.oab) {
+          updates.oab = analysis.oabNumber;
+        }
+        if (analysis.practiceAreas && analysis.practiceAreas.length > 0 && !formData.specialties) {
+          updates.specialties = analysis.practiceAreas.join(', ');
+        }
+
+        // Atualizar formulário
+        setFormData(prev => ({ ...prev, ...updates }));
+      }
+
+      Alert.alert(
+        'CV Processado com Sucesso!',
+        'Suas informações foram extraídas e alguns campos foram preenchidos automaticamente. Você pode revisar e editar antes de continuar.',
+        [{ text: 'OK' }]
+      );
+
+    } catch (error) {
+      console.error('Erro ao processar CV:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao processar CV';
+      setError(errorMessage);
+      Alert.alert('Erro no Processamento', errorMessage);
+    } finally {
+      setIsProcessingCV(false);
     }
   };
 
@@ -239,6 +345,40 @@ export default function RegisterLawyer() {
         return (
           <View>
             <Text style={styles.stepTitle}>3. Documentos</Text>
+            
+            {/* Upload de CV - Novo campo */}
+            <TouchableOpacity 
+              style={[styles.uploadButton, styles.cvUploadButton]} 
+              onPress={handlePickCV}
+              disabled={isProcessingCV}
+            >
+              <View style={styles.uploadButtonContent}>
+                <UploadCloud size={24} color={cvDocument ? '#10B981' : '#7C3AED'} />
+                <Text style={[styles.uploadButtonText, styles.cvUploadText]}>
+                  {isProcessingCV ? 'Processando CV...' : 
+                   cvDocument ? 'CV Enviado e Processado' : 'Enviar Currículo (PDF/TXT)'}
+                </Text>
+                {cvDocument && !isProcessingCV && <CheckCircle size={24} color="#10B981" />}
+                {isProcessingCV && <ActivityIndicator size={24} color="#7C3AED" />}
+              </View>
+              {cvDocument && <Text style={styles.fileName}>{cvDocument.name}</Text>}
+              {cvAnalysis && (
+                <View style={styles.cvAnalysisPreview}>
+                  <Text style={styles.cvAnalysisText}>
+                    ✓ {cvAnalysis.totalExperience} anos de experiência detectados
+                  </Text>
+                  <Text style={styles.cvAnalysisText}>
+                    ✓ {cvAnalysis.practiceAreas.length} áreas de atuação identificadas
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.cvDescription}>
+              📋 Opcional: Envie seu currículo para preenchimento automático do perfil. 
+              Nossa IA extrairá informações como experiência, especialidades e formação.
+            </Text>
+
             <TouchableOpacity style={styles.uploadButton} onPress={() => handlePickImage(setOabDocument)}>
               <View style={styles.uploadButtonContent}>
                 <UploadCloud size={24} color={oabDocument ? '#10B981' : '#1E40AF'} />
@@ -382,5 +522,36 @@ const styles = StyleSheet.create({
   },
   flex2: {
     flex: 2,
+  },
+  cvUploadButton: {
+    borderColor: '#DDD6FE',
+    backgroundColor: '#F3F4F6',
+  },
+  cvUploadText: {
+    color: '#7C3AED',
+    fontFamily: 'Inter-Bold',
+  },
+  cvAnalysisPreview: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  cvAnalysisText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#059669',
+    marginBottom: 4,
+  },
+  cvDescription: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 16,
+    paddingHorizontal: 8,
   },
 }); 

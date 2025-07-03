@@ -103,6 +103,87 @@ const mockPreAnalysis = {
   ]
 };
 
+// Sample detailed data
+export const mockDetailedData = {
+  '001': {
+    preAnalysis: {
+      caseTitle: 'Rescisão Trabalhista',
+      analysisDate: '2024-01-15T10:30:00Z',
+      confidence: 92,
+      estimatedCost: 3500,
+      riskLevel: 'medium' as const,
+      keyPoints: [
+        'Demissão sem justa causa comprovada',
+        'Direito a todas as verbas rescisórias',
+        'Possível indenização adicional por danos morais',
+        'Documentação trabalhista completa',
+        'Prazo para ação ainda válido'
+      ]
+    },
+    consultInfo: {
+      scheduledDate: '2024-01-22T14:00:00Z',
+      duration: '45 minutos',
+      type: 'Consulta Presencial',
+      plan: 'Premium'
+    },
+    steps: [
+      {
+        title: 'Análise de Documentos',
+        description: 'Revisão completa da documentação trabalhista',
+        status: 'completed' as const,
+        priority: 8,
+        dueDate: '2024-01-16'
+      },
+      {
+        title: 'Cálculo de Verbas',
+        description: 'Cálculo detalhado das verbas rescisórias devidas',
+        status: 'active' as const,
+        priority: 9,
+        dueDate: '2024-01-20'
+      },
+      {
+        title: 'Notificação Extrajudicial',
+        description: 'Envio de notificação para tentativa de acordo',
+        status: 'pending' as const,
+        priority: 7,
+        dueDate: '2024-01-25'
+      }
+    ],
+    documents: [
+      { 
+        id: 'doc1', 
+        name: 'Carteira de Trabalho.pdf', 
+        size: 2048576, 
+        uploadedAt: '2024-01-15T10:30:00Z' 
+      },
+      { 
+        id: 'doc2', 
+        name: 'Contrato de Trabalho.pdf', 
+        size: 1536000, 
+        uploadedAt: '2024-01-15T11:45:00Z' 
+      },
+      { 
+        id: 'doc3', 
+        name: 'Comprovantes de Pagamento.pdf', 
+        size: 3072000, 
+        uploadedAt: '2024-01-16T09:20:00Z' 
+      },
+      { 
+        id: 'doc4', 
+        name: 'Termo de Rescisão.pdf', 
+        size: 1024000, 
+        uploadedAt: '2024-01-16T14:10:00Z' 
+      }
+    ],
+    costs: {
+      consultationFee: 300,
+      legalFees: 2500,
+      courtCosts: 450,
+      totalEstimate: 3250
+    }
+  }
+};
+
 const HEADER_HEIGHT = 220; // Approximate height of CaseHeader + Filters
 
 export default function MyCasesList() {
