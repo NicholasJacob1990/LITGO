@@ -1,2 +1,0 @@
-# YUDEX
-yudex app
