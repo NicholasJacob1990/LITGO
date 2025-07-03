@@ -29,7 +29,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={['#1E3A8A', '#1E40AF']}
+        colors={['#1F2937', '#374151']}
         style={styles.background}
       />
       <View style={styles.header}>
@@ -55,9 +55,9 @@ export default function HomeScreen() {
           onPress={() => router.push('/NewCase')}
           activeOpacity={0.8}
         >
-          <Bot size={24} color="#1E40AF" />
+          <Bot size={24} color="#374151" />
           <Text style={styles.ctaButtonText}>Iniciar Consulta com IA</Text>
-          <ArrowRight size={24} color="#1E40AF" />
+          <ArrowRight size={24} color="#374151" />
         </TouchableOpacity>
       </View>
     </View>
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   ctaButtonText: {
-    color: '#1E40AF',
+    color: '#374151',
     fontSize: 18,
     fontWeight: 'bold',
     marginHorizontal: 12,
