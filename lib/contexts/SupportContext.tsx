@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { SupportTicket, getSupportTickets } from '@/lib/services/support';
 import { useAuth } from './AuthContext';
 
@@ -17,8 +17,8 @@ export const SupportProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchTickets = async () => {
-    if (!user) {
+  const fetchTickets = useCallback(async () => {
+    if (!user?.id) {
       setTickets([]);
       setIsLoading(false);
       return;
@@ -31,17 +31,17 @@ export const SupportProvider = ({ children }: { children: ReactNode }) => {
       const data = await getSupportTickets(user.id);
       setTickets(data || []);
     } catch (e) {
+      console.error('Error fetching tickets:', e);
       setError(e as Error);
+      setTickets([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    if(user?.id){
-      fetchTickets();
-    }
-  }, [user?.id]);
+    fetchTickets();
+  }, [fetchTickets]);
 
   return (
     <SupportContext.Provider value={{ tickets, isLoading, error, refetchTickets: fetchTickets }}>

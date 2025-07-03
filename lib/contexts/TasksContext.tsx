@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { Task, getTasks } from '@/lib/services/tasks';
 import { useAuth } from './AuthContext';
 
@@ -17,8 +17,8 @@ export const TasksProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchTasks = async () => {
-    if (!user) {
+  const fetchTasks = useCallback(async () => {
+    if (!user?.id) {
       setTasks([]);
       setIsLoading(false);
       return;
@@ -31,17 +31,17 @@ export const TasksProvider = ({ children }: { children: ReactNode }) => {
       const data = await getTasks(user.id);
       setTasks(data || []);
     } catch (e) {
+      console.error('Error fetching tasks:', e);
       setError(e as Error);
+      setTasks([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    if(user?.id){
-      fetchTasks();
-    }
-  }, [user?.id]);
+    fetchTasks();
+  }, [fetchTasks]);
 
   return (
     <TasksContext.Provider value={{ tasks, isLoading, error, refetchTasks: fetchTasks }}>
