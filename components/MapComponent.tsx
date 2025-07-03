@@ -1,7 +1,24 @@
 import React from 'react';
-import LawyerMapView from './LawyerMapView';
+import { Platform } from 'react-native';
 
-// O Metro automaticamente resolverá para LawyerMapView.web.tsx na web
-// e LawyerMapView.tsx em plataformas nativas
+// Importação condicional por plataforma
+const LawyerMapView = Platform.OS === 'web' 
+  ? require('./LawyerMapView.web').default 
+  : require('./LawyerMapView').default;
 
-export default LawyerMapView; 
+interface MapComponentProps {
+  lawyers: any[];
+  selectedLawyer: any;
+  onSelectLawyer: (lawyer: any) => void;
+  region: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  };
+  onRegionChange: (region: any) => void;
+}
+
+export default function MapComponent(props: MapComponentProps) {
+  return <LawyerMapView {...props} />;
+} 

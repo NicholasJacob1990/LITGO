@@ -131,6 +131,7 @@ function AppTabs() {
       <Tabs.Screen name="cases/MyCasesList" options={{ href: null }} />
       <Tabs.Screen name="cases/ClientCasesScreen" options={{ href: null }} />
       <Tabs.Screen name="cases/LawyerCasesScreen" options={{ href: null }} />
+      <Tabs.Screen name="support/[ticketId]" options={{ href: null }} />
     </Tabs>
   );
 }
