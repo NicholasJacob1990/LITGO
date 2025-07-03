@@ -52,7 +52,7 @@ export default function HomeScreen() {
         </Text>
         <TouchableOpacity
           style={styles.ctaButton}
-          onPress={() => router.push('/NewCase')}
+          onPress={() => router.push('/chat-triagem')}
           activeOpacity={0.8}
         >
           <Bot size={24} color="#1E293B" />
