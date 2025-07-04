@@ -97,6 +97,27 @@ export const updateTaskStatus = async (taskId: string, status: Task['status']) =
 };
 
 /**
+ * Busca todas as tarefas de um caso específico.
+ * @param caseId - O ID do caso.
+ */
+export const getCaseTasks = async (caseId: string) => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      assignee:profiles!assigned_to (id, full_name, avatar_url)
+    `)
+    .eq('case_id', caseId)
+    .order('due_date', { ascending: true, nullsFirst: false });
+
+  if (error) {
+    console.error('Error fetching case tasks:', error);
+    throw error;
+  }
+  return data;
+};
+
+/**
  * Exclui uma tarefa.
  * @param taskId - O ID da tarefa.
  */

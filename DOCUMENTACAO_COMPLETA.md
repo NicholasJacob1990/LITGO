@@ -1,826 +1,715 @@
-# 📚 DOCUMENTAÇÃO COMPLETA - LITGO5
+# 📚 Documentação Completa - LITGO5
 
 ## 🎯 Visão Geral do Projeto
 
-**LITGO5** é uma plataforma jurídica mobile desenvolvida em React Native/Expo que conecta clientes a advogados através de inteligência artificial. O sistema oferece triagem jurídica automatizada, gestão de casos diferenciada por perfil de usuário e comunicação integrada.
+O **LITGO5** é um sistema de match jurídico inteligente que conecta clientes a advogados especializados através de algoritmos de IA e análise semântica. O sistema utiliza processamento de linguagem natural (LLM) para triagem de casos e um algoritmo proprietário para ranking de advogados.
 
-### 🏗️ Arquitetura Técnica
+### 🏗️ Arquitetura do Sistema
 
-- **Frontend**: React Native + Expo
-- **Backend**: Supabase (PostgreSQL + Auth + Realtime)
-- **IA**: OpenAI GPT-4o-mini
-- **Autenticação**: Supabase Auth com RLS
-- **Navegação**: Expo Router (File-based routing)
-- **Estado Global**: React Context API
-- **Estilização**: StyleSheet nativo + LinearGradient
-
----
-
-## 🔧 Implementações Realizadas
-
-### 1. 🏠 **RESTAURAÇÃO E REDESIGN DA HOME**
-
-#### **Problema Identificado**
-- Home havia sido modificada, perdendo funcionalidade principal
-- Design não estava alinhado com identidade visual desejada
-- Acesso ao chatbot estava com fricção desnecessária
-
-#### **Solução Implementada**
-- **Restauração completa** do backup original
-- **Novo esquema de cores**: Tons escuros e sóbrios (`#0F172A`, `#1E293B`)
-- **Acesso direto ao chatbot**: Botão "Iniciar Consulta com IA" → `/chat-triagem`
-- **Header personalizado**: Boas-vindas + botão de logout
-- **Design responsivo**: Gradiente profissional + elementos visuais limpos
-
-#### **Arquivos Modificados**
-```
-app/(tabs)/index.tsx
-```
-
-#### **Código-chave**
-```typescript
-// Acesso direto ao chatbot
-<TouchableOpacity
-  style={styles.ctaButton}
-  onPress={() => router.push('/chat-triagem')}
->
-  <Bot size={24} color="#1E293B" />
-  <Text style={styles.ctaButtonText}>Iniciar Consulta com IA</Text>
-  <ArrowRight size={24} color="#1E293B" />
-</TouchableOpacity>
+```mermaid
+graph TB
+    A[Cliente Mobile/Web] --> B[Frontend React Native/Expo]
+    B --> C[API Gateway FastAPI]
+    C --> D[Worker Celery]
+    C --> E[Redis Cache/Queue]
+    C --> F[Supabase PostgreSQL]
+    D --> G[Claude AI - Triagem]
+    D --> H[OpenAI - Embeddings]
+    C --> I[Algoritmo Match v2.1]
+    F --> J[pgvector - Embeddings]
+    K[Job DataJud] --> F
 ```
 
 ---
 
-### 2. 🔐 **SISTEMA DE AUTENTICAÇÃO E ROLES**
+## 🚀 Stack Tecnológica
 
-#### **Implementação do AuthContext**
+### Backend
+- **Framework**: FastAPI 0.104+
+- **Linguagem**: Python 3.10+
+- **Banco de Dados**: PostgreSQL (Supabase) com extensão pgvector
+- **Cache/Filas**: Redis 7.0+
+- **Processamento Assíncrono**: Celery
+- **IA/LLM**: Anthropic Claude 3.5 Sonnet, OpenAI GPT-3.5/4
+- **Autenticação**: JWT via Supabase Auth
 
-**Arquivo**: `lib/contexts/AuthContext.tsx`
+### Frontend
+- **Framework**: React Native com Expo
+- **Linguagem**: TypeScript
+- **Navegação**: Expo Router
+- **Estado**: Context API + Hooks
+- **UI**: NativeWind (Tailwind CSS)
 
-```typescript
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  role: UserRole; // 'client' | 'lawyer' | null
-  isLoading: boolean;
-}
-```
-
-#### **Funcionalidades**
-- **Detecção automática de papel**: Baseada em `user_metadata.role`
-- **Estado global**: Disponível em toda a aplicação
-- **Integração com Supabase**: Listener automático de mudanças
-- **Hook personalizado**: `useAuth()` para acesso facilitado
-
-#### **Integração no Layout Raiz**
-```typescript
-// app/_layout.tsx
-export default function RootLayout() {
-  return (
-    <AuthProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* ... rotas */}
-      </Stack>
-    </AuthProvider>
-  );
-}
-```
+### DevOps
+- **Containerização**: Docker + Docker Compose
+- **CI/CD**: GitHub Actions (configuração futura)
+- **Monitoramento**: Logs estruturados JSON
+- **Deploy**: Render/Railway (backend), Expo EAS (mobile)
 
 ---
 
-### 3. 🎭 **DIFERENCIAÇÃO POR PERFIL DE USUÁRIO**
+## 🔧 Configuração do Ambiente
 
-#### **Roteador Dinâmico**
+### Pré-requisitos
 
-**Arquivo**: `app/(tabs)/cases.tsx`
-
-```typescript
-export default function CasesRouter() {
-  const { role, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  return role === 'lawyer' ? <LawyerCasesScreen /> : <ClientCasesScreen />;
-}
-```
-
-#### **Tela do Cliente** (`ClientCasesScreen.tsx`)
-- **Stack Navigator**: Navegação entre lista, detalhes e documentos
-- **Interface preservada**: Mantém UX original
-- **Funcionalidades**:
-  - Lista de casos com filtros
-  - Detalhes completos do caso
-  - Gestão de documentos
-  - Chat integrado
-
-#### **Tela do Advogado** (`LawyerCasesScreen.tsx`)
-- **Dashboard profissional**: KPIs em tempo real
-- **Métricas importantes**:
-  - Casos Ativos
-  - Casos Aguardando
-  - Faturamento Total
-- **Lista avançada**: Cards com informações detalhadas
-- **Integração com Supabase**: Dados reais via RPC
-
-```typescript
-// Dashboard KPIs
-const LawyerDashboard = () => (
-  <View style={styles.dashboard}>
-    <View style={styles.kpi}>
-      <Briefcase size={24} color="#3B82F6" />
-      <Text style={styles.kpiValue}>12</Text>
-      <Text style={styles.kpiLabel}>Casos Ativos</Text>
-    </View>
-    {/* ... outros KPIs */}
-  </View>
-);
-```
-
----
-
-### 4. 🗄️ **CONFIGURAÇÃO DO BANCO DE DADOS**
-
-#### **Migração Supabase**
-
-**Arquivo**: `supabase/migrations/20250706000000_setup_cases_and_messages.sql`
-
-#### **Tabela Messages**
-```sql
-create table if not exists public.messages (
-    id uuid primary key default gen_random_uuid(),
-    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-    case_id uuid references public.cases(id) on delete cascade not null,
-    user_id uuid references auth.users(id) on delete cascade not null,
-    content text not null,
-    read boolean default false not null
-);
-```
-
-#### **Políticas RLS**
-```sql
--- Usuários podem ver mensagens apenas de seus próprios casos
-create policy "Users can view messages in their own cases"
-on public.messages for select
-using (
-    case_id in (
-        select id from public.cases 
-        where client_id = auth.uid() or lawyer_id = auth.uid()
-    )
-);
-```
-
-#### **Função RPC**
-```sql
-create or replace function get_user_cases(p_user_id uuid)
-returns table (
-    id uuid,
-    created_at timestamp with time zone,
-    client_id uuid,
-    lawyer_id uuid,
-    status text,
-    area text,
-    summary_ai jsonb,
-    unread_messages bigint,
-    client_name text,
-    lawyer_name text
-)
-```
-
----
-
-### 5. 🤖 **INTEGRAÇÃO COM OPENAI**
-
-#### **Chatbot LEX-9000**
-
-**Arquivo**: `app/chat-triagem.tsx`
-
-#### **Funcionalidades**
-- **Chat em tempo real**: Interface conversacional
-- **Triagem jurídica**: Análise inteligente de casos
-- **Indicador de digitação**: Feedback visual durante processamento
-- **Histórico persistente**: Mensagens salvas na sessão
-- **Análise completa**: Redirecionamento para síntese
-
-#### **Fluxo de Conversação**
-1. **Mensagem inicial**: LEX-9000 se apresenta
-2. **Coleta de informações**: 3-10 perguntas adaptativas
-3. **Processamento**: Análise via OpenAI
-4. **Resultado**: Síntese jurídica completa
-
-```typescript
-const handleSendMessage = async () => {
-  const chatHistory = convertToChatGPTFormat(messages);
-  const response = await generateTriageAnalysis(chatHistory);
-  
-  if (response.isComplete) {
-    setAnalysisResult(response.analysis);
-    router.push('/sintese');
-  } else {
-    addMessage(response.nextQuestion, false);
-  }
-};
-```
-
-#### **Análise de Currículos**
-
-**Função**: `analyzeLawyerCV(cvText: string)`
-
-```typescript
-export interface CVAnalysisResult {
-  personalInfo: {
-    name: string;
-    email?: string;
-    phone?: string;
-    // ... outros campos
-  };
-  professionalSummary: string;
-  education: Array<{
-    degree: string;
-    institution: string;
-    year?: number;
-  }>;
-  experience: Array<{
-    position: string;
-    company: string;
-    startDate: string;
-    endDate?: string;
-    description: string;
-  }>;
-  practiceAreas: string[];
-  totalExperience: number;
-  consultationFee?: number;
-  // ... outros campos
-}
-```
-
-#### **Triagem Jurídica Avançada**
-
-**Função**: `generateTriageAnalysis(history: ChatGPTMessage[])`
-
-**Metodologia**:
-- **Fase 1**: Identificação inicial (1-2 perguntas)
-- **Fase 2**: Detalhamento factual (2-6 perguntas)
-- **Fase 3**: Aspectos técnicos (0-4 perguntas)
-
-**Schema da Análise Final**:
-```json
-{
-  "classificacao": {
-    "area_principal": "Direito Trabalhista",
-    "assunto_principal": "Rescisão Indireta",
-    "natureza": "Contencioso"
-  },
-  "analise_viabilidade": {
-    "classificacao": "Viável",
-    "probabilidade_exito": "Alta",
-    "complexidade": "Média"
-  },
-  "urgencia": {
-    "nivel": "Alta",
-    "motivo": "Prazo prescricional próximo"
-  },
-  "recomendacoes": {
-    "estrategia_sugerida": "Judicial",
-    "proximos_passos": ["Reunir documentos", "Consultar advogado"]
-  }
-}
-```
-
----
-
-### 6. 🎨 **SISTEMA DE DESIGN**
-
-#### **Componentes Reutilizáveis**
-
-**Atoms** (Componentes básicos):
-- `Avatar`: Foto de perfil com status online
-- `Badge`: Etiquetas coloridas para status
-- `ProgressBar`: Barras de progresso
-- `MoneyTile`: Exibição de valores monetários
-- `StatusDot`: Indicadores visuais de status
-
-**Molecules** (Componentes compostos):
-- `CaseActions`: Ações do caso (chat, vídeo, telefone)
-- `CaseHeader`: Cabeçalho com estatísticas
-- `CaseMeta`: Metadados do caso
-- `DocumentItem`: Item de documento
-- `StepItem`: Item de passo do processo
-
-**Organisms** (Componentes complexos):
-- `CaseCard`: Card completo do caso
-- `CostRiskCard`: Card de custos e riscos
-- `DocumentsList`: Lista de documentos
-- `PreAnalysisCard`: Card de pré-análise
-
-#### **Paleta de Cores**
-```typescript
-const colors = {
-  primary: '#1E293B',
-  secondary: '#0F172A',
-  accent: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  neutral: '#6B7280',
-  background: '#F8FAFC',
-  surface: '#FFFFFF'
-};
-```
-
----
-
-### 7. 📱 **NAVEGAÇÃO E ROTEAMENTO**
-
-#### **Estrutura de Rotas**
-```
-app/
-├── _layout.tsx                 # Layout raiz com AuthProvider
-├── (auth)/                     # Grupo de autenticação
-│   ├── _layout.tsx
-│   ├── index.tsx              # Login/Welcome
-│   ├── role-selection.tsx     # Seleção de perfil
-│   ├── register-client.tsx    # Cadastro cliente
-│   └── register-lawyer.tsx    # Cadastro advogado
-├── (tabs)/                    # Grupo de abas principais
-│   ├── _layout.tsx           # Layout das abas
-│   ├── index.tsx             # Home
-│   ├── cases.tsx             # Roteador de casos
-│   ├── cases/                # Subgrupo de casos
-│   │   ├── ClientCasesScreen.tsx
-│   │   ├── LawyerCasesScreen.tsx
-│   │   ├── CaseDetail.tsx
-│   │   ├── CaseDocuments.tsx
-│   │   └── MyCasesList.tsx
-│   ├── chat.tsx              # Chat geral
-│   ├── profile.tsx           # Perfil do usuário
-│   └── advogados.tsx         # Lista de advogados
-├── chat-triagem.tsx          # Chat de triagem IA
-├── NewCase.tsx               # Novo caso
-├── onboarding.tsx            # Onboarding
-├── triagem.tsx               # Triagem manual
-└── sintese.tsx               # Síntese jurídica
-```
-
-#### **Configuração das Abas**
-```typescript
-// Rotas ocultas (não aparecem como abas)
-<Tabs.Screen
-  name="cases/CaseDetail"
-  options={{ href: null }}
-/>
-```
-
----
-
-### 8. 🔒 **SEGURANÇA E AUTENTICAÇÃO**
-
-#### **Row Level Security (RLS)**
-
-**Políticas Implementadas**:
-- **Cases**: Usuários veem apenas casos onde são cliente ou advogado
-- **Messages**: Acesso apenas a mensagens de casos próprios
-- **Profiles**: Cada usuário acessa apenas seu próprio perfil
-
-#### **Fluxo de Autenticação**
-1. **Login**: Supabase Auth
-2. **Detecção de Role**: Via `user_metadata.role`
-3. **Roteamento**: Baseado no papel do usuário
-4. **Persistência**: Sessão automática
-5. **Logout**: Limpeza completa do estado
-
----
-
-### 9. 📊 **MÉTRICAS E ANALYTICS**
-
-#### **Estados dos Casos**
-- **Triagem**: Análise IA em andamento
-- **Atribuído**: Advogado designado
-- **Pagamento**: Aguardando pagamento
-- **Atendimento**: Em atendimento ativo
-- **Finalizado**: Caso concluído
-
-#### **KPIs do Advogado**
-- **Casos Ativos**: Casos em andamento
-- **Casos Aguardando**: Pendentes de ação
-- **Faturamento**: Valor total faturado
-- **Avaliação**: Nota média dos clientes
-
-#### **Métricas do Cliente**
-- **Casos Totais**: Histórico completo
-- **Casos Ativos**: Em andamento
-- **Gastos**: Valor total investido
-- **Satisfação**: Avaliações dadas
-
----
-
-## 🚀 Guia de Instalação e Configuração
-
-### **Pré-requisitos**
 ```bash
-# Node.js (versão 18+)
-node --version
-
-# Expo CLI
-npm install -g @expo/cli
-
-# Supabase CLI
-npm install -g supabase
+# Ferramentas necessárias
+- Node.js 18+ LTS
+- Python 3.10+
+- Docker & Docker Compose
+- Git
+- Expo CLI
 ```
 
-### **Instalação**
+### 1. Clonagem e Setup Inicial
+
 ```bash
-# Clone o repositório
+# Clonar repositório
 git clone <repository-url>
 cd LITGO5
 
-# Instale as dependências
+# Instalar dependências do frontend
 npm install
 
-# Configure as variáveis de ambiente
-cp .env.example .env.local
+# Configurar backend
+cd backend
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
+pip install -r requirements.txt
 ```
 
-### **Configuração das Variáveis**
+### 2. Configuração de Variáveis de Ambiente
+
+Criar arquivo `.env` na raiz do projeto:
+
 ```env
-# .env.local
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-EXPO_PUBLIC_OPENAI_API_KEY=your_openai_api_key
+# === SUPABASE ===
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+
+# === AI SERVICES ===
+ANTHROPIC_API_KEY=sk-ant-your-claude-key
+OPENAI_API_KEY=sk-your-openai-key
+
+# === REDIS ===
+REDIS_URL=redis://localhost:6379/0
+
+# === API ===
+EXPO_PUBLIC_API_URL=http://127.0.0.1:8000/api
+
+# === AMBIENTE ===
+ENVIRONMENT=development
+TESTING=false
 ```
 
-### **Configuração do Supabase**
-```bash
-# Inicie o Supabase localmente
-supabase start
+### 3. Configuração do Banco de Dados
 
-# Aplique as migrações
-supabase db push
+```sql
+-- Aplicar migração pgvector
+-- Executar no SQL Editor do Supabase
+CREATE EXTENSION IF NOT EXISTS vector;
 
-# Verifique o status
-supabase status
+-- Aplicar migrações existentes
+-- Ver: supabase/migrations/20250719000000_enable_pgvector.sql
 ```
 
-### **Executar o Projeto**
+---
+
+## 🏃‍♂️ Executando o Projeto
+
+### Desenvolvimento Local com Docker (Recomendado)
+
 ```bash
+# Na raiz do projeto
+docker-compose up --build
+
+# Serviços disponíveis:
+# - API: http://localhost:8000
+# - Redis: localhost:6379
+# - Worker Celery: logs no terminal
+```
+
+### Desenvolvimento Manual
+
+```bash
+# Terminal 1: Redis
+docker run -d -p 6379:6379 redis:alpine
+
+# Terminal 2: API
+cd backend
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 3: Worker Celery
+cd backend
+celery -A backend.celery_app worker --loglevel=info
+
+# Terminal 4: Frontend
+cd ..
+npx expo start
+```
+
+### Executando Testes
+
+```bash
+# Backend (após correções)
+cd backend
+TESTING=true python -m pytest tests/ -v
+
+# Frontend
+npm run lint
+npm run test  # Se configurado
+```
+
+---
+
+## 📡 Documentação da API
+
+### Endpoints Principais
+
+#### 1. Triagem Assíncrona
+```http
+POST /api/triage
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "texto_cliente": "Fui demitido sem justa causa e não recebi as verbas rescisórias",
+  "coords": [-23.5505, -46.6333]
+}
+```
+
+**Resposta:**
+```json
+{
+  "task_id": "abc123-def456",
+  "status": "accepted",
+  "message": "A triagem do seu caso foi iniciada..."
+}
+```
+
+#### 2. Status da Triagem
+```http
+GET /api/triage/status/{task_id}
+Authorization: Bearer <jwt_token>
+```
+
+**Resposta (Concluída):**
+```json
+{
+  "status": "completed",
+  "result": {
+    "case_id": "case-789",
+    "area": "Trabalhista",
+    "subarea": "Rescisão",
+    "urgency_h": 48,
+    "embedding": [0.1, 0.2, ...]
+  }
+}
+```
+
+#### 3. Match de Advogados
+```http
+POST /api/match
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "case_id": "case-789",
+  "k": 5,
+  "equity": 0.3
+}
+```
+
+**Resposta:**
+```json
+{
+  "case_id": "case-789",
+  "matches": [
+    {
+      "lawyer_id": "lw-001",
+      "nome": "Dr. João Silva",
+      "fair": 0.95,
+      "equity": 0.8,
+      "features": {
+        "A": 1.0,
+        "S": 0.9,
+        "T": 0.85,
+        "G": 0.7,
+        "Q": 0.8,
+        "U": 0.9,
+        "R": 0.88
+      },
+      "avatar_url": "https://...",
+      "is_available": true,
+      "primary_area": "Trabalhista",
+      "rating": 4.8,
+      "distance_km": 2.5
+    }
+  ]
+}
+```
+
+#### 4. Explicação de Matches
+```http
+POST /api/explain
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "case_id": "case-789",
+  "lawyer_ids": ["lw-001", "lw-002"]
+}
+```
+
+**Resposta:**
+```json
+{
+  "explanations": {
+    "lw-001": "Dr. João Silva é uma excelente opção! Com 95% de compatibilidade e alta taxa de sucesso em casos trabalhistas similares, ele está bem preparado para te ajudar. Além disso, seu escritório fica próximo a você.",
+    "lw-002": "Dra. Maria Santos também é uma ótima escolha..."
+  }
+}
+```
+
+---
+
+## 🧠 Algoritmo de Match
+
+### Núcleo: `algoritmo_match_v2_1_stable_readable.py`
+
+O algoritmo utiliza 7 features principais com pesos específicos:
+
+```python
+WEIGHTS = {
+    "A": 0.30,  # Area Match - Compatibilidade de área
+    "S": 0.25,  # Similarity - Similaridade de casos
+    "T": 0.15,  # Taxa de sucesso
+    "G": 0.10,  # Geolocalização
+    "Q": 0.10,  # Qualificação (experiência + títulos)
+    "U": 0.05,  # Urgência vs capacidade de resposta
+    "R": 0.05,  # Rating/avaliações
+}
+```
+
+### Fluxo do Algoritmo
+
+1. **Cálculo Raw Score**: Soma ponderada das 7 features
+2. **Epsilon Clustering**: Agrupa advogados com score similar (±5%)
+3. **Aplicação de Equidade**: Favorece advogados com menor carga de trabalho
+4. **Ranking Final**: Ordena por score justo + desempate por timestamp
+
+### Exemplo de Uso
+
+```python
+from backend.algoritmo_match import MatchmakingAlgorithm, Case, Lawyer
+
+# Criar instância do algoritmo
+matcher = MatchmakingAlgorithm()
+
+# Executar ranking
+top_lawyers = matcher.rank(case, candidates, top_n=5)
+```
+
+---
+
+## 🎨 Componentes Frontend
+
+### Estrutura de Telas
+
+```
+app/
+├── (auth)/                 # Autenticação
+│   ├── index.tsx          # Login
+│   ├── register-client.tsx
+│   └── register-lawyer.tsx
+├── (tabs)/                # Navegação principal
+│   ├── index.tsx          # Home
+│   ├── cases.tsx          # Meus casos
+│   └── advogados.tsx      # Lista de advogados
+├── triagem.tsx            # Triagem inteligente
+├── MatchesPage.tsx        # Resultados do match
+└── chat-triagem.tsx       # Chat com IA
+```
+
+### Componentes Principais
+
+#### LawyerMatchCard
+```tsx
+// Exibe advogado com botão de explicação
+<LawyerMatchCard 
+  lawyer={lawyer} 
+  onSelect={() => selectLawyer(lawyer.id)}
+  caseId={caseId}
+/>
+```
+
+#### useTaskPolling Hook
+```tsx
+// Hook para polling de status de tarefas
+const { taskResult, isLoading, error } = useTaskPolling(taskId);
+
+useEffect(() => {
+  if (taskResult?.status === 'completed') {
+    // Navegar para próxima tela
+  }
+}, [taskResult]);
+```
+
+---
+
+## 🔄 Fluxo de Dados
+
+### 1. Triagem de Caso
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant F as Frontend
+    participant A as API
+    participant W as Worker
+    participant AI as Claude AI
+    participant DB as Supabase
+
+    C->>F: Descreve caso
+    F->>A: POST /triage
+    A->>W: Envia tarefa Celery
+    W->>AI: Análise com Claude
+    W->>DB: Salva caso + embedding
+    F->>A: Polling status
+    A->>F: Status completed
+    F->>A: POST /match
+    A->>F: Lista de advogados
+```
+
+### 2. Sistema de Filas
+
+```python
+# Configuração Celery
+# backend/celery_app.py
+celery_app = Celery(
+    "tasks",
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/0"
+)
+
+# Tarefa assíncrona
+@celery_app.task(name="tasks.run_triage_async")
+def run_triage_async_task(texto_cliente: str, coords: tuple = None):
+    # Processamento LLM + embedding + persistência
+    pass
+```
+
+---
+
+## 🔐 Segurança
+
+### Autenticação JWT
+
+```python
+# backend/auth.py
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    user_response = supabase.auth.get_user(token)
+    if not user_response.user:
+        raise HTTPException(401, "Token inválido")
+    return user_response.user
+```
+
+### Rate Limiting
+
+```python
+# backend/main.py
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+# Aplicado nas rotas
+@limiter.limit("60/minute")
+@router.post("/triage")
+async def http_triage_case(...):
+    pass
+```
+
+### CORS Configuração
+
+```python
 # Desenvolvimento
-npm start
+origins = ["http://localhost:8081", "http://localhost:3000"]
 
-# iOS
-npm run ios
-
-# Android
-npm run android
+# Produção
+origins = [os.getenv("FRONTEND_URL")]
 ```
 
 ---
 
-## 🧪 Testes e Validação
+## 📊 Monitoramento e Logs
 
-### **Testes de Funcionalidade**
+### Logs Estruturados
 
-#### **Fluxo do Cliente**
-1. ✅ Login como cliente
-2. ✅ Acesso à home
-3. ✅ Iniciar chat de triagem
-4. ✅ Completar análise IA
-5. ✅ Visualizar casos na aba "Meus Casos"
-6. ✅ Acessar detalhes do caso
-7. ✅ Chat com advogado
+```python
+# Configuração de logging JSON
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "context": record.args,
+        })
 
-#### **Fluxo do Advogado**
-1. ✅ Login como advogado
-2. ✅ Visualizar dashboard com KPIs
-3. ✅ Lista de casos atribuídos
-4. ✅ Filtrar casos por status
-5. ✅ Acessar detalhes do caso
-6. ✅ Chat com cliente
+# Logs de auditoria
+AUDIT_LOGGER.info("recommend", extra={
+    "case": case.id, 
+    "lawyer": lawyer.id, 
+    "fair": score
+})
+```
 
-#### **Funcionalidades da IA**
-1. ✅ Chat de triagem responsivo
-2. ✅ Análise de currículos
-3. ✅ Geração de síntese jurídica
-4. ✅ Classificação por área do direito
-5. ✅ Avaliação de viabilidade
+### Métricas Importantes
+
+- **Tempo de resposta da triagem**: Monitorar latência do LLM
+- **Taxa de sucesso de matches**: % de matches que resultam em contratação
+- **Uso de recursos**: CPU/Memory do worker Celery
+- **Erros de API**: 4xx/5xx por endpoint
 
 ---
 
-## 📈 Roadmap e Melhorias Futuras
+## 🚀 Deploy e Produção
 
-### **Próximas Implementações**
+### Backend (Render/Railway)
 
-#### **Curto Prazo (1-2 semanas)**
-- [ ] **Chat em tempo real**: Integração com Supabase Realtime
-- [ ] **Notificações push**: Expo Notifications
-- [ ] **Upload de documentos**: Supabase Storage
-- [ ] **Pagamentos**: Integração com Stripe
-- [ ] **Videochamadas**: Integração com Agora.io
+```dockerfile
+# backend/Dockerfile
+FROM python:3.10-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", 
+     "backend.main:app", "--bind", "0.0.0.0:8000"]
+```
 
-#### **Médio Prazo (1-2 meses)**
-- [ ] **App mobile nativo**: Build para stores
-- [ ] **Dashboard web**: Painel administrativo
-- [ ] **Relatórios avançados**: Analytics detalhados
-- [ ] **Integração com OAB**: Validação de advogados
-- [ ] **Sistema de avaliações**: Feedback bidirecional
+### Frontend (Expo EAS)
 
-#### **Longo Prazo (3-6 meses)**
-- [ ] **IA avançada**: GPT-4 Turbo
-- [ ] **Reconhecimento de voz**: Transcrição automática
-- [ ] **Blockchain**: Contratos inteligentes
-- [ ] **Marketplace**: Plataforma de serviços jurídicos
-- [ ] **Internacionalização**: Suporte a múltiplos idiomas
+```json
+// eas.json
+{
+  "build": {
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.litgo.com/api"
+      }
+    }
+  }
+}
+```
+
+### Variáveis de Ambiente Produção
+
+```bash
+# Secrets no provedor
+ENVIRONMENT=production
+SUPABASE_URL=https://prod.supabase.co
+ANTHROPIC_API_KEY=sk-ant-prod-key
+REDIS_URL=redis://prod-redis:6379/0
+FRONTEND_URL=https://app.litgo.com
+```
 
 ---
 
-## 🔧 Troubleshooting
+## 🧪 Testes
 
-### **Problemas Comuns**
+### Backend Tests
 
-#### **1. Erro de Importação do Componente Lock**
-```bash
-# Erro: Cannot resolve symbol 'Lock'
-# Solução: Verificar importação em app/(tabs)/index.tsx
-import { Lock } from 'lucide-react-native';
+```python
+# tests/test_match.py
+def test_match_endpoint_success(client, mock_supabase):
+    # Mock dados
+    mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value.data = get_mock_case_data()
+    
+    # Testar endpoint
+    response = client.post("/api/match", json={"case_id": "test-case"})
+    
+    # Assertions
+    assert response.status_code == 200
+    assert "matches" in response.json()
 ```
 
-#### **2. Erro de Autenticação**
+### Executar Testes
+
 ```bash
-# Erro: Invalid JWT
-# Solução: Verificar variáveis de ambiente
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# Com correções aplicadas
+cd backend
+TESTING=true python -m pytest tests/ -v --cov=backend
+
+# Testes de integração
+python -m pytest tests/integration/ -v
 ```
 
-#### **3. Erro de Migração**
-```bash
-# Erro: Migration failed
-# Solução: Reset do banco local
-supabase db reset
-supabase db push
+---
+
+## 🐛 Problemas Conhecidos e Soluções
+
+### 1. Erro Rate Limiter nos Testes
+
+**Problema:**
+```
+AttributeError: 'APIRouter' object has no attribute '__name__'
 ```
 
-#### **4. Erro da OpenAI**
+**Solução:**
+```python
+# backend/main.py - ANTES
+limiter.limit("60/minute")(api_router)  # ❌ Incorreto
+
+# backend/routes.py - DEPOIS  
+@router.post("/triage")
+@limiter.limit("60/minute")  # ✅ Correto
+async def http_triage_case(...):
+    pass
+```
+
+### 2. Configuração CORS Produção
+
+**Problema:** Origins localhost em produção
+
+**Solução:**
+```python
+origins = [
+    os.getenv("FRONTEND_URL", "https://app.litgo.com")
+] if os.getenv("ENVIRONMENT") == "production" else [
+    "http://localhost:8081",
+    "http://localhost:3000"
+]
+```
+
+### 3. Job DataJud Simulado
+
+**Problema:** API real do CNJ não implementada
+
+**Solução:**
+```python
+def get_success_rate_for_lawyer(oab_number: str) -> float:
+    try:
+        url = f"https://api-publica.datajud.cnj.jus.br/api_publica_tjpb/_search"
+        payload = {"query": {"term": {"advogado.oab": oab_number}}}
+        response = requests.post(url, json=payload, timeout=30)
+        # Processar resposta real...
+    except Exception as e:
+        logger.warning(f"DataJud API error: {e}")
+        return 0.0  # Fallback
+```
+
+---
+
+## 📈 Roadmap e Melhorias
+
+### Próximas Implementações
+
+1. **Cache Inteligente**
+   - Redis para embeddings frequentes
+   - Cache de resultados de match por 1h
+
+2. **Métricas Avançadas**
+   - Dashboard de performance
+   - Alertas automáticos
+   - A/B testing de algoritmos
+
+3. **Otimizações**
+   - Índices compostos no Supabase
+   - Paralelização de embeddings
+   - Compressão de vetores
+
+4. **Funcionalidades**
+   - Match reverso (advogado → casos)
+   - Sistema de recomendação
+   - Chat direto advogado-cliente
+
+### Melhorias de Código
+
+1. **Testes**
+   - Cobertura 90%+
+   - Testes de carga
+   - Testes E2E com Playwright
+
+2. **Documentação**
+   - OpenAPI specs completas
+   - Diagramas de arquitetura
+   - Guias de troubleshooting
+
+3. **DevOps**
+   - CI/CD automatizado
+   - Staging environment
+   - Backup automatizado
+
+---
+
+## 🆘 Troubleshooting
+
+### Problemas Comuns
+
+#### Backend não inicia
 ```bash
-# Erro: OpenAI API error: 401
-# Solução: Verificar API key
-EXPO_PUBLIC_OPENAI_API_KEY=sk-your-api-key
+# Verificar variáveis de ambiente
+cat .env | grep -E "(SUPABASE|REDIS|ANTHROPIC)"
+
+# Testar conexão Redis
+redis-cli ping
+
+# Verificar logs
+docker-compose logs api
+```
+
+#### Worker Celery não processa tarefas
+```bash
+# Verificar conexão Redis
+celery -A backend.celery_app inspect ping
+
+# Logs detalhados
+celery -A backend.celery_app worker --loglevel=debug
+```
+
+#### Frontend não conecta com API
+```bash
+# Verificar URL da API
+echo $EXPO_PUBLIC_API_URL
+
+# Testar endpoint
+curl http://127.0.0.1:8000/
+```
+
+### Logs Importantes
+
+```bash
+# Logs da API
+docker-compose logs -f api
+
+# Logs do Worker
+docker-compose logs -f worker
+
+# Logs do Redis
+docker-compose logs -f redis
 ```
 
 ---
 
 ## 📞 Suporte e Contato
 
-### **Documentação Adicional**
-- [Expo Documentation](https://docs.expo.dev/)
-- [Supabase Documentation](https://supabase.com/docs)
-- [OpenAI API Reference](https://platform.openai.com/docs)
-- [React Native Documentation](https://reactnative.dev/docs)
+### Documentação Adicional
+- **Algoritmo**: `docs/Algoritmo.md`
+- **API Contract**: `docs/API_contract_v2.md`
+- **Arquitetura Assíncrona**: `docs/Async_architecture.md`
+- **Setup Google Calendar**: `GOOGLE_CALENDAR_SETUP_MANUAL.md`
 
-### **Arquivos de Configuração**
-- `app.config.ts`: Configuração do Expo
-- `tsconfig.json`: Configuração do TypeScript
-- `package.json`: Dependências do projeto
-- `supabase/config.toml`: Configuração do Supabase
-
----
-
-## 📋 Checklist de Deploy
-
-### **Pré-Deploy**
-- [ ] Todas as variáveis de ambiente configuradas
-- [ ] Migrações aplicadas no Supabase
-- [ ] Testes de funcionalidade passando
-- [ ] Build local funcionando
-- [ ] Documentação atualizada
-
-### **Deploy em Produção**
-- [ ] Configurar projeto no Supabase (produção)
-- [ ] Aplicar migrações em produção
-- [ ] Configurar domínio personalizado
-- [ ] Configurar SSL/TLS
-- [ ] Configurar backup automático
-
-### **Pós-Deploy**
-- [ ] Monitoramento de erros configurado
-- [ ] Analytics configurado
-- [ ] Testes de aceitação
-- [ ] Documentação de usuário
-- [ ] Treinamento da equipe
+### Estrutura do Time
+- **Backend**: Python/FastAPI
+- **Frontend**: React Native/TypeScript
+- **DevOps**: Docker/Cloud
+- **IA/ML**: LLM Integration
 
 ---
 
-## 🎯 Conclusão
-
-O **LITGO5** representa uma solução completa e moderna para o mercado jurídico, combinando:
-
-- **Tecnologia de ponta**: React Native, Supabase, OpenAI
-- **Experiência diferenciada**: Interfaces específicas por perfil
-- **Inteligência artificial**: Triagem e análise automatizada
-- **Segurança robusta**: RLS e autenticação avançada
-- **Escalabilidade**: Arquitetura preparada para crescimento
-
-### **Impacto Esperado**
-- **Redução de 70%** no tempo de triagem jurídica
-- **Aumento de 50%** na satisfação do cliente
-- **Melhoria de 40%** na eficiência dos advogados
-- **Crescimento de 200%** na base de usuários
-
-### **Diferencial Competitivo**
-- **IA Jurídica Especializada**: LEX-9000 treinado especificamente
-- **Experiência Personalizada**: Interfaces adaptadas por perfil
-- **Integração Completa**: Desde triagem até finalização
-- **Tecnologia Moderna**: Stack atualizado e performático
-
----
-
-**Versão da Documentação**: 1.0  
-**Data de Atualização**: Janeiro 2025  
-**Autor**: Equipe de Desenvolvimento LITGO5  
-**Status**: ✅ Implementado e Funcional 
-
-## 🔧 Configurações Implementadas
-
-### 1. 🗓️ **Integração Google Calendar**
-
-#### ✅ **Configuração Concluída:**
-- **Projeto Google Cloud**: `litgo5-nicholasjacob`
-- **Faturamento**: Vinculado à conta `01B7BA-619DED-36A10D`
-- **APIs Habilitadas**:
-  - Google Calendar API (`calendar-json.googleapis.com`)
-  - Identity Toolkit API (`identitytoolkit.googleapis.com`)
-  - IAM Credentials API (`iamcredentials.googleapis.com`)
-
-#### 📱 **Arquivos Configurados:**
-- `lib/services/calendar.ts` - Serviço de integração com Google Calendar
-- `lib/contexts/CalendarContext.tsx` - Context para gerenciar estado do calendário
-- `app/(tabs)/agenda.tsx` - Tela de agenda com sincronização
-- `app/_layout.tsx` - Provider do calendário incluído
-
-#### 🔐 **Credenciais OAuth:**
-- **Status**: Configuradas com placeholders
-- **Próximo passo**: Configurar credenciais reais no Console Google Cloud
-
-#### 🚀 **Como Configurar Credenciais:**
-
-1. **Execute o script de instruções**:
-   ```bash
-   ./setup_oauth_manual.sh
-   ```
-
-2. **Siga as instruções para criar**:
-   - OAuth Consent Screen
-   - iOS Client ID
-   - Web Client ID + Secret
-
-3. **Configure as credenciais**:
-   ```bash
-   ./configure_credentials.sh IOS_CLIENT_ID WEB_CLIENT_ID WEB_CLIENT_SECRET
-   ```
-
-#### 🔄 **Funcionalidades Implementadas:**
-- ✅ Autenticação OAuth 2.0 com Google
-- ✅ Sincronização de eventos do Google Calendar
-- ✅ Fallback para banco de dados local
-- ✅ Interface de usuário para sincronização
-- ✅ Indicadores de carregamento e erro
-- ✅ Suporte a refresh manual
-
----
-
-### 2. 🗺️ **Correção de Mapas Web**
-
-#### ❌ **Problema Resolvido:**
-- **Erro**: "Importing native-only module react-native-maps on web"
-- **Causa**: react-native-maps não funciona na web
-
-#### ✅ **Solução Implementada:**
-- **Arquivo**: `components/LawyerMapView.web.tsx` - Versão web sem react-native-maps
-- **Arquivo**: `components/MapComponent.tsx` - Wrapper que resolve automaticamente
-- **Resultado**: Metro escolhe automaticamente a versão correta por plataforma
-
----
-
-### 3. 🔧 **Scripts de Configuração**
-
-#### 📜 **Scripts Criados:**
-- `setup_google_calendar.sh` - Script completo de configuração (com problemas no gcloud alpha)
-- `setup_oauth_manual.sh` - Instruções manuais para OAuth
-- `configure_credentials.sh` - Script para configurar credenciais no código
-
-#### 🔄 **Status dos Scripts:**
-- ✅ `setup_oauth_manual.sh` - Funcional
-- ✅ `configure_credentials.sh` - Funcional
-- ⚠️ `setup_google_calendar.sh` - Problemas com gcloud alpha oauth
-
----
-
-### 4. 📊 **Diferenças entre Telas de Casos**
-
-#### 👤 **Tela do Cliente** (`ClientCasesScreen.tsx`):
-- **Função**: Navegador entre telas (`MyCasesList`, `CaseDetail`, `CaseDocuments`, `NewCase`)
-- **Características**: Não tem interface própria, apenas organiza navegação
-
-#### ⚖️ **Tela do Advogado** (`LawyerCasesScreen.tsx`):
-- **Função**: Painel de controle com interface própria
-- **Características**: 
-  - KPIs (Casos Ativos, Faturado)
-  - Lista de casos com informações do cliente
-  - Dados de honorários
-  - Busca integrada com Supabase
-
----
-
-### 5. 🚨 **Erros Identificados nos Logs**
-
-#### ⚠️ **Warnings de Roteamento:**
-- **Problema**: Rotas "admin" e "legal-intake" não existem
-- **Impacto**: Warnings no console, mas não afeta funcionalidade
-- **Status**: Identificado, correção opcional
-
-#### 🔴 **Erros de Dados:**
-- **Problema**: UUID inválido "mock-2" ao buscar advogado
-- **Causa**: Dados de exemplo com IDs inválidos
-- **Status**: Identificado, correção necessária
-
-#### 🔒 **Erros de Segurança:**
-- **Problema**: Violação de política RLS na tabela "tasks"
-- **Causa**: Política de segurança muito restritiva
-- **Status**: Identificado, correção necessária
-
----
-
-### 6. 📋 **Próximos Passos Recomendados**
-
-#### 🔐 **Prioridade Alta:**
-1. **Configurar credenciais OAuth reais** seguindo `setup_oauth_manual.sh`
-2. **Corrigir políticas RLS** na tabela `tasks`
-3. **Substituir dados mock** por dados reais com UUIDs válidos
-
-#### 🔧 **Prioridade Média:**
-4. **Limpar warnings de roteamento** removendo referências a rotas inexistentes
-5. **Implementar integração Outlook** (estrutura já preparada)
-6. **Adicionar testes** para integração do calendário
-
-#### 📈 **Prioridade Baixa:**
-7. **Otimizar performance** da sincronização
-8. **Adicionar mais providers** de calendário
-9. **Implementar cache** para eventos
-
----
-
-### 7. 🔍 **Comandos Úteis**
-
-#### 🚀 **Desenvolvimento:**
-```bash
-# Iniciar aplicativo
-npx expo start
-
-# Iniciar apenas web
-npx expo start --web
-
-# Limpar cache
-npx expo start -c
-```
-
-#### 🗓️ **Google Calendar:**
-```bash
-# Ver instruções OAuth
-./setup_oauth_manual.sh
-
-# Configurar credenciais
-./configure_credentials.sh IOS_ID WEB_ID WEB_SECRET
-
-# Verificar projeto Google Cloud
-gcloud config get-value project
-```
-
-#### 📊 **Banco de Dados:**
-```bash
-# Conectar ao Supabase
-npx supabase status
-
-# Ver logs
-npx supabase logs
-```
-
----
-
-### 8. 📚 **Recursos e Referências**
-
-#### 🔗 **Links Importantes:**
-- [Google Cloud Console](https://console.cloud.google.com/apis/credentials?project=litgo5-nicholasjacob)
-- [Google Calendar API Docs](https://developers.google.com/calendar/api/v3/reference)
-- [Expo Auth Session](https://docs.expo.dev/guides/authentication/#google)
-
-#### 📖 **Documentação Adicional:**
-- `GOOGLE_CALENDAR_SETUP_MANUAL.md` - Guia detalhado de configuração
-- `README_TECNICO.md` - Documentação técnica geral
-- `SETUP_INSTRUCTIONS.md` - Instruções de setup inicial
-
----
-
-**Última atualização**: $(date)
-**Versão**: 1.2.0
-**Status**: ✅ Integração Google Calendar configurada, aguardando credenciais OAuth reais 
+**Última atualização**: Janeiro 2025  
+**Versão**: 2.1-stable  
+**Status**: Em desenvolvimento ativo 

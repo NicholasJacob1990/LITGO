@@ -17,7 +17,7 @@ export const TasksProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchTasks = useCallback(async () => {
+  const refetchTasks = useCallback(async () => {
     if (!user?.id) {
       setTasks([]);
       setIsLoading(false);
@@ -40,11 +40,16 @@ export const TasksProvider = ({ children }: { children: ReactNode }) => {
   }, [user?.id]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if (user?.id) {
+        refetchTasks();
+    } else {
+        setTasks([]);
+        setIsLoading(false);
+    }
+  }, [user?.id, refetchTasks]);
 
   return (
-    <TasksContext.Provider value={{ tasks, isLoading, error, refetchTasks: fetchTasks }}>
+    <TasksContext.Provider value={{ tasks, isLoading, error, refetchTasks }}>
       {children}
     </TasksContext.Provider>
   );

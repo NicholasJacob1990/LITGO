@@ -1,6 +1,7 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import supabase from '../supabase';
+import { isEqual } from 'lodash';
 
 type UserRole = 'client' | 'lawyer' | null;
 
@@ -25,20 +26,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      setRole(session?.user?.user_metadata?.role || null);
+    const getInitialSession = async () => {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      setRole(initialSession?.user?.user_metadata?.role || null);
       setIsLoading(false);
     };
 
-    getSession();
+    getInitialSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setRole(session?.user?.user_metadata?.role || null);
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(prevSession => {
+        if (!isEqual(prevSession, newSession)) {
+          return newSession;
+        }
+        return prevSession;
+      });
+      setUser(prevUser => {
+        if (!isEqual(prevUser, newSession?.user ?? null)) {
+          return newSession?.user ?? null;
+        }
+        return prevUser;
+      });
+      setRole(newSession?.user?.user_metadata?.role || null);
     });
 
     return () => {
@@ -46,8 +57,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  const value = useMemo(() => ({
+    user,
+    session,
+    role,
+    isLoading
+  }), [user, session, role, isLoading]);
+
   return (
-    <AuthContext.Provider value={{ user, session, role, isLoading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

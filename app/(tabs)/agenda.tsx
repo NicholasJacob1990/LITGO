@@ -4,8 +4,13 @@ import { Agenda, LocaleConfig } from 'react-native-calendars';
 import { Calendar as CalendarIcon, Wifi, WifiOff, RefreshCw } from 'lucide-react-native';
 import { useCalendar } from '@/lib/contexts/CalendarContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { saveCalendarCredentials, fetchGoogleEvents } from '@/lib/services/calendar';
+import { 
+  useGoogleAuth, 
+  exchangeCodeForTokens,
+  saveCalendarCredentials, 
+} from '@/lib/services/calendar';
 import * as WebBrowser from 'expo-web-browser';
+import { AuthSessionResult } from 'expo-auth-session';
 
 // Configuração de localidade para português
 LocaleConfig.locales['pt-br'] = {
@@ -25,41 +30,17 @@ export default function AgendaScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSync = useCallback(async () => {
-    if (!user) {
-      Alert.alert('Erro', 'Usuário não autenticado');
-      return;
-    }
+    Alert.alert(
+      'Em Desenvolvimento',
+      'A sincronização com o Google Calendar está sendo aprimorada e será reativada em breve.'
+    );
+  }, []);
 
-    try {
-      setIsSyncing(true);
-      Alert.alert(
-        'Sincronizar Calendário',
-        'Deseja sincronizar com o Google Calendar?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Sincronizar', 
-            onPress: async () => {
-              try {
-                // Aqui seria implementada a lógica de OAuth do Google
-                // Por enquanto, apenas refetch dos eventos locais
-                await refetchEvents();
-                Alert.alert('Sucesso', 'Eventos atualizados!');
-              } catch (error) {
-                console.error('Erro ao sincronizar:', error);
-                Alert.alert('Erro', 'Falha ao sincronizar calendário');
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Erro detalhado na sincronização:', error);
-      Alert.alert('Erro', 'Falha na sincronização');
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [user, refetchEvents]);
+  const onRefresh = useCallback(async () => {
+    setIsSyncing(true);
+    await refetchEvents();
+    setIsSyncing(false);
+  }, [refetchEvents]);
 
   const formattedEvents = useMemo(() => {
     const items: { [key: string]: any[] } = {};
@@ -151,7 +132,7 @@ export default function AgendaScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isSyncing}
-              onRefresh={handleSync}
+              onRefresh={onRefresh}
               colors={['#0F172A']}
             />
           }

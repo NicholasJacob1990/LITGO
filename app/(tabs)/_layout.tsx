@@ -1,8 +1,9 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Briefcase, MessageCircle, User, Users, Calendar, LifeBuoy, CheckSquare } from 'lucide-react-native';
+import { Home, Briefcase, MessageCircle, User, Users, Calendar, LifeBuoy, CheckSquare, ListTodo, Settings } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 const PRIMARY_COLOR = '#0F172A';
 const SECONDARY_COLOR = '#1E293B';
@@ -36,9 +37,7 @@ function AppTabs() {
         name="index"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color, focused }) => (
-            <Home size={focused ? 26 : 24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
         }}
       />
 
@@ -48,9 +47,7 @@ function AppTabs() {
           name="advogados"
           options={{
             title: 'Advogados',
-            tabBarIcon: ({ color, focused }) => (
-              <Users size={focused ? 26 : 24} color={color} />
-            ),
+            tabBarIcon: ({ color }) => <FontAwesome size={28} name="users" color={color} />,
           }}
         />
       )}
@@ -59,56 +56,37 @@ function AppTabs() {
       <Tabs.Screen
         name="cases"
         options={{
-          title: 'Meus Casos',
-          tabBarIcon: ({ color, focused }) => (
-            <Briefcase size={focused ? 26 : 24} color={color} />
-          ),
+          title: 'Casos',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="briefcase" color={color} />,
         }}
       />
+
+      {/* Aba Contratos - Apenas para Advogados */}
+      {role === 'lawyer' && (
+        <Tabs.Screen
+          name="contracts"
+          options={{
+            title: 'Contratos',
+            tabBarIcon: ({ color }) => <FontAwesome size={28} name="file-text" color={color} />,
+          }}
+        />
+      )}
 
       {/* Aba Agenda - Para todos os usuários */}
       <Tabs.Screen
         name="agenda"
         options={{
           title: 'Agenda',
-          tabBarIcon: ({ color, focused }) => (
-            <Calendar size={focused ? 26 : 24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="calendar" color={color} />,
         }}
       />
-
-      {/* Aba Tarefas - Apenas para advogados */}
-      {role === 'lawyer' && (
-        <Tabs.Screen
-          name="tasks"
-          options={{
-            title: 'Tarefas',
-            tabBarIcon: ({ color, focused }) => (
-              <CheckSquare size={focused ? 26 : 24} color={color} />
-            ),
-          }}
-        />
-      )}
 
       {/* Aba Chat - Para todos os usuários */}
       <Tabs.Screen
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color, focused }) => (
-            <MessageCircle size={focused ? 26 : 24} color={color} />
-          ),
-        }}
-      />
-
-      {/* Aba Suporte - Para todos os usuários */}
-      <Tabs.Screen
-        name="support"
-        options={{
-          title: 'Suporte',
-          tabBarIcon: ({ color, focused }) => (
-            <LifeBuoy size={focused ? 26 : 24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="comments" color={color} />,
         }}
       />
 
@@ -117,9 +95,7 @@ function AppTabs() {
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, focused }) => (
-            <User size={focused ? 26 : 24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="user" color={color} />,
         }}
       />
 
@@ -131,7 +107,6 @@ function AppTabs() {
       <Tabs.Screen name="cases/MyCasesList" options={{ href: null }} />
       <Tabs.Screen name="cases/ClientCasesScreen" options={{ href: null }} />
       <Tabs.Screen name="cases/LawyerCasesScreen" options={{ href: null }} />
-      <Tabs.Screen name="support/[ticketId]" options={{ href: null }} />
     </Tabs>
   );
 }

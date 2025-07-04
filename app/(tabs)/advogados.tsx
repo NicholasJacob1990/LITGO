@@ -1,18 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Animated, FlatList, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Animated, FlatList, Pressable , Switch } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Star, Clock, Video, MessageCircle, Users, Filter, Sliders, Map, List, CheckCircle, Navigation, Search, X, ChevronLeft } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams , Stack } from 'expo-router';
 import LawyerCard from '@/components/LawyerCard';
 import MapComponent from '@/components/MapComponent';
-import { LawyerService, LawyerSearchResult, LawyersNearbyParams, assignLawyerToCase } from '@/lib/supabase';
+import supabase, { LawyerService, LawyerSearchResult, LawyersNearbyParams, assignLawyerToCase , Lawyer } from '@/lib/supabase';
 import LocationService from '@/components/LocationService';
-import { Stack } from 'expo-router';
-import supabase from '@/lib/supabase';
-import { Lawyer } from '@/lib/supabase';
 import Slider from '@react-native-community/slider';
-import { Switch } from 'react-native';
 
 // Adicionando dados mockados para visualização
 const mockLawyers: LawyerSearchResult[] = [
@@ -45,7 +41,12 @@ function LawyerSelectionScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [selectedLawyer, setSelectedLawyer] = useState<LawyerSearchResult | null>(null);
-  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [mapRegion, setMapRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [lawyers, setLawyers] = useState<LawyerSearchResult[]>([]);
@@ -53,6 +54,9 @@ function LawyerSelectionScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const filterAnimation = useRef(new Animated.Value(0)).current;
+
+  // Novo estado para o loading inicial
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const legalAreas = [
     'Direito Trabalhista',
@@ -97,7 +101,13 @@ function LawyerSelectionScreen() {
     // Simula o carregamento dos dados
     setTimeout(() => {
       setLawyers(mockLawyers);
-      setUserLocation({ latitude: -23.5505, longitude: -46.6333 }); // Localização mockada
+      setMapRegion({ 
+        latitude: -23.5505, 
+        longitude: -46.6333,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      }); // Localização mockada
+      setIsInitialLoading(false); // Desativa o loading inicial
       setIsLoading(false);
     }, 1000);
   }, []);
@@ -365,33 +375,47 @@ function LawyerSelectionScreen() {
 
       {showFilters && renderFilterPanel()}
       
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#1E40AF" style={{ marginTop: 50 }} />
-      ) : locationError ? (
-        <View style={styles.emptyContainer}><Text>{locationError}</Text></View>
-      ) : lawyers.length === 0 ? (
-        <View style={styles.emptyContainer}><Text>Nenhum advogado encontrado.</Text></View>
+      {isInitialLoading ? (
+        <View style={styles.fullScreenLoader}>
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text style={styles.loaderText}>Buscando advogados...</Text>
+        </View>
       ) : (
-        viewMode === 'list' ? (
-          <FlatList
-            ListHeaderComponent={() => <Text style={styles.infoText}>Nenhum advogado encontrado perto de você. Mostrando exemplos.</Text>}
-            data={lawyers}
-            renderItem={({ item }) => (
-              <LawyerCard 
-                lawyer={item}
-                onPress={() => handleLawyerPress(item)}
+        <>
+          {isLoading && (
+            <View style={styles.listLoaderOverlay}>
+              <ActivityIndicator size="large" color="#1E40AF" />
+            </View>
+          )}
+          {locationError ? (
+            <View style={styles.emptyContainer}><Text>{locationError}</Text></View>
+          ) : lawyers.length === 0 ? (
+            <View style={styles.emptyContainer}><Text>Nenhum advogado encontrado.</Text></View>
+          ) : (
+            viewMode === 'list' ? (
+              <FlatList
+                ListHeaderComponent={() => <Text style={styles.infoText}>Nenhum advogado encontrado perto de você. Mostrando exemplos.</Text>}
+                data={lawyers}
+                renderItem={({ item }) => (
+                  <LawyerCard 
+                    lawyer={item}
+                    onPress={() => handleLawyerPress(item)}
+                  />
+                )}
+                keyExtractor={item => item.id}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}
               />
-            )}
-            keyExtractor={item => item.id}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}
-          />
-        ) : (
-          <MapComponent 
-            lawyers={lawyers}
-            userLocation={userLocation}
-            onMarkerPress={(lawyer) => router.push('/(tabs)/lawyer-details')}
-          />
-        )
+            ) : (
+              mapRegion && <MapComponent 
+                lawyers={lawyers}
+                region={mapRegion}
+                onSelectLawyer={() => {}}
+                onRegionChange={() => {}}
+                selectedLawyer={null}
+              />
+            )
+          )}
+        </>
       )}
       
       {selectedLawyer && (
@@ -627,6 +651,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 24,
     paddingHorizontal: 16,
+  },
+  fullScreenLoader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  listLoaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(243, 244, 246, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#374151',
+    fontFamily: 'Inter-SemiBold',
   },
 });
 

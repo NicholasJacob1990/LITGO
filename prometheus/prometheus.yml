@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'litgo-backend'
+    # O Docker Compose expõe os serviços pelo nome do container.
+    # 'host.docker.internal' é um DNS especial para o host a partir do container.
+    static_configs:
+      - targets: ['host.docker.internal:8000'] 

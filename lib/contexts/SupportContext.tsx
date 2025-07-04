@@ -17,7 +17,7 @@ export const SupportProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchTickets = useCallback(async () => {
+  const refetchTickets = useCallback(async () => {
     if (!user?.id) {
       setTickets([]);
       setIsLoading(false);
@@ -40,11 +40,16 @@ export const SupportProvider = ({ children }: { children: ReactNode }) => {
   }, [user?.id]);
 
   useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
+    if (user?.id) {
+        refetchTickets();
+    } else {
+        setTickets([]);
+        setIsLoading(false);
+    }
+  }, [user?.id, refetchTickets]);
 
   return (
-    <SupportContext.Provider value={{ tickets, isLoading, error, refetchTickets: fetchTickets }}>
+    <SupportContext.Provider value={{ tickets, isLoading, error, refetchTickets }}>
       {children}
     </SupportContext.Provider>
   );

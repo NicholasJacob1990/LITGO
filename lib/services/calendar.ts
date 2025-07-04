@@ -1,7 +1,7 @@
 import supabase from '@/lib/supabase';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri, exchangeCodeAsync, AuthSessionResult } from 'expo-auth-session';
+import { makeRedirectUri, exchangeCodeAsync } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -88,52 +88,6 @@ export const saveCalendarCredentials = async (credentials: CalendarCredentials) 
 };
 
 /**
- * Hook para gerenciar a autenticação com o Google.
- * Retorna o request e a função para iniciar o fluxo de login.
- */
-export const useGoogleAuth = () => {
-  const redirectUri = makeRedirectUri({
-    scheme: 'com.anonymous.boltexponativewind',
-    path: 'redirect'
-  });
-  
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: "[REMOVIDO_POR_SEGURANCA]",
-    androidClientId: "[REMOVIDO_POR_SEGURANCA]",
-    webClientId: "[REMOVIDO_POR_SEGURANCA]",
-    scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events'],
-    clientSecret: "[REMOVIDO_POR_SEGURANCA]",
-    redirectUri,
-  });
-
-  return { request, response, promptAsync, redirectUri };
-};
-
-/**
- * Troca o código de autorização por tokens de acesso e refresh.
- * @param code - O código de autorização retornado pelo fluxo OAuth.
- * @param redirectUri - O URI de redirecionamento usado na requisição inicial.
- */
-export const exchangeCodeForTokens = async (code: string, redirectUri: string) => {
-  try {
-    const tokenResponse = await exchangeCodeAsync(
-      {
-        code,
-        clientId: "[REMOVIDO_POR_SEGURANCA]",
-        clientSecret: "[REMOVIDO_POR_SEGURANCA]",
-        redirectUri,
-      },
-      Google.discovery
-    );
-
-    return tokenResponse;
-  } catch (error) {
-    console.error('Error exchanging code for tokens:', error);
-    throw error;
-  }
-};
-
-/**
  * Busca as credenciais de calendário salvas para um usuário.
  * @param userId - O ID do usuário.
  * @param provider - O provedor ('google' ou 'outlook').
@@ -191,6 +145,51 @@ export const fetchGoogleEvents = async (accessToken: string) => {
 
   } catch (error) {
     console.error('Error fetching from Google Calendar API:', error);
+    throw error;
+  }
+};
+
+/**
+ * Hook para gerenciar a autenticação com o Google de forma segura.
+ * Lê as credenciais do ambiente.
+ */
+export const useGoogleAuth = () => {
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events'],
+  });
+
+  return { request, response, promptAsync };
+};
+
+/**
+ * Troca o código de autorização por tokens de acesso e refresh.
+ * @param code - O código de autorização retornado pelo fluxo OAuth.
+ */
+export const exchangeCodeForTokens = async (code: string) => {
+  const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_WEB_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Credenciais de cliente Web do Google não estão configuradas no ambiente.');
+  }
+
+  try {
+    const tokenResponse = await exchangeCodeAsync(
+      {
+        code,
+        clientId,
+        clientSecret,
+        redirectUri: makeRedirectUri(),
+      },
+      Google.discovery
+    );
+
+    return tokenResponse;
+  } catch (error) {
+    console.error('Error exchanging code for tokens:', error);
     throw error;
   }
 };

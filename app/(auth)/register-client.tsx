@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeOff } from 'lucide-react-native';
@@ -24,24 +24,74 @@ export default function RegisterClient() {
   });
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error for the field being edited
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
   
-  const handleRegister = async () => {
-    setLoading(true);
-    setError(null);
-
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
     const { email, password, fullName, cpf, companyName, cnpj, phone } = formData;
 
-    if (!email || !password) {
-        setError("E-mail e senha são obrigatórios.");
-        setLoading(false);
-        return;
+    // Common fields validation
+    if (!email.trim()) {
+      newErrors.email = 'E-mail é obrigatório.';
+    } else if (!/S+@S+\.S+/.test(email)) {
+      newErrors.email = 'Formato de e-mail inválido.';
+    }
+    
+    if (!password) {
+      newErrors.password = 'Senha é obrigatória.';
+    } else if (password.length < 8) {
+      newErrors.password = 'A senha deve ter pelo menos 8 caracteres.';
+    }
+    
+    if (!phone.trim()) {
+      newErrors.phone = 'Telefone é obrigatório.';
+    } else if (!/^d{10,11}$/.test(phone.replace(/[^d]/g, ''))) {
+      newErrors.phone = 'Formato de telefone inválido (DDD + número).';
     }
 
+    // Conditional fields validation
+    if (userType === 'PF') {
+        if (!fullName.trim()) {
+          newErrors.fullName = 'Nome Completo é obrigatório.';
+        }
+        if (!cpf.trim()) {
+          newErrors.cpf = 'CPF é obrigatório.';
+        } else if (!/^d{11}$/.test(cpf.replace(/[^d]/g, ''))) {
+          newErrors.cpf = 'CPF deve ter 11 dígitos.';
+        }
+    } else { // PJ
+        if (!companyName.trim()) {
+          newErrors.companyName = 'Razão Social é obrigatória.';
+        }
+        if (!cnpj.trim()) {
+          newErrors.cnpj = 'CNPJ é obrigatório.';
+        } else if (!/^d{14}$/.test(cnpj.replace(/[^d]/g, ''))) {
+          newErrors.cnpj = 'CNPJ deve ter 14 dígitos.';
+        }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) return;
+    
+    setLoading(true);
+    const { email, password, fullName, cpf, companyName, cnpj, phone } = formData;
+    
     const { data: { user }, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -58,8 +108,16 @@ export default function RegisterClient() {
     });
 
     if (signUpError) {
-      setError(signUpError.message);
-      Alert.alert('Erro no Cadastro', signUpError.message);
+      let errorMessage = 'Ocorreu um erro desconhecido. Tente novamente.';
+      if (signUpError.message.includes('unique constraint')) {
+        errorMessage = 'Este e-mail já está em uso.';
+        setErrors({ email: errorMessage });
+      } else if (signUpError.message.toLowerCase().includes('password should be at least')) {
+        errorMessage = 'A senha é muito fraca. Tente uma mais longa ou complexa.';
+        setErrors({ password: errorMessage });
+      } else {
+        setErrors({ form: errorMessage }); // General form error
+      }
     } else if (user) {
       Alert.alert(
         'Cadastro Quase Completo', 
@@ -70,13 +128,33 @@ export default function RegisterClient() {
     setLoading(false);
   };
 
+  const renderInput = (
+    name: keyof typeof formData, 
+    placeholder: string, 
+    options: { keyboardType?: any, maxLength?: number, autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters' } = {}
+  ) => (
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={[styles.input, errors[name] && styles.inputError]}
+        placeholder={placeholder}
+        value={formData[name]}
+        onChangeText={(val) => handleInputChange(name, val)}
+        keyboardType={options.keyboardType || 'default'}
+        maxLength={options.maxLength}
+        autoCapitalize={options.autoCapitalize || 'sentences'}
+        placeholderTextColor="#9CA3AF"
+      />
+      {errors[name] && <Text style={styles.errorText}>{errors[name]}</Text>}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Crie sua Conta de Cliente</Text>
           <Text style={styles.subtitle}>Preencha os dados abaixo para começar.</Text>
 
@@ -97,78 +175,42 @@ export default function RegisterClient() {
           {/* Formulário Condicional */}
           {userType === 'PF' ? (
             <>
-              <TextInput
-                style={styles.input}
-                placeholder="Nome Completo"
-                value={formData.fullName}
-                onChangeText={(val) => handleInputChange('fullName', val)}
-                placeholderTextColor="#9CA3AF"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="CPF"
-                value={formData.cpf}
-                onChangeText={(val) => handleInputChange('cpf', val)}
-                keyboardType="numeric"
-                placeholderTextColor="#9CA3AF"
-              />
+              {renderInput('fullName', 'Nome Completo', { autoCapitalize: 'words' })}
+              {renderInput('cpf', 'CPF', { keyboardType: 'numeric', maxLength: 11 })}
             </>
           ) : (
             <>
-              <TextInput
-                style={styles.input}
-                placeholder="Razão Social"
-                value={formData.companyName}
-                onChangeText={(val) => handleInputChange('companyName', val)}
-                placeholderTextColor="#9CA3AF"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="CNPJ"
-                value={formData.cnpj}
-                onChangeText={(val) => handleInputChange('cnpj', val)}
-                keyboardType="numeric"
-                placeholderTextColor="#9CA3AF"
-              />
+              {renderInput('companyName', 'Razão Social', { autoCapitalize: 'words' })}
+              {renderInput('cnpj', 'CNPJ', { keyboardType: 'numeric', maxLength: 14 })}
             </>
           )}
 
           {/* Campos Comuns */}
-          <TextInput
-            style={styles.input}
-            placeholder="E-mail"
-            value={formData.email}
-            onChangeText={(val) => handleInputChange('email', val)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#9CA3AF"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Telefone"
-            value={formData.phone}
-            onChangeText={(val) => handleInputChange('phone', val)}
-            keyboardType="phone-pad"
-            placeholderTextColor="#9CA3AF"
-          />
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Senha"
-              value={formData.password}
-              onChangeText={(val) => handleInputChange('password', val)}
-              secureTextEntry={!isPasswordVisible}
-              placeholderTextColor="#9CA3AF"
-            />
-            <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)} style={styles.eyeIcon}>
-              {isPasswordVisible ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
-            </TouchableOpacity>
+          {renderInput('email', 'E-mail', { keyboardType: 'email-address', autoCapitalize: 'none' })}
+          {renderInput('phone', 'Telefone', { keyboardType: 'phone-pad', maxLength: 15 })}
+
+          <View style={styles.inputContainer}>
+            <View style={[styles.passwordWrapper, errors.password && styles.inputError]}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Senha"
+                value={formData.password}
+                onChangeText={(val) => handleInputChange('password', val)}
+                secureTextEntry={!isPasswordVisible}
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)} style={styles.eyeIcon}>
+                {isPasswordVisible ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+              </TouchableOpacity>
+            </View>
+            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
           </View>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {errors.form && <Text style={styles.formErrorText}>{errors.form}</Text>}
 
           <TouchableOpacity style={[styles.registerButton, loading && styles.registerButtonDisabled]} onPress={handleRegister} disabled={loading}>
-            <Text style={styles.registerButtonText}>{loading ? 'Criando Conta...' : 'Criar Conta'}</Text>
+            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.registerButtonText}>Criar Conta</Text>}
           </TouchableOpacity>
           
         </ScrollView>
@@ -230,6 +272,9 @@ const styles = StyleSheet.create({
     selectorTextActive: {
         color: '#1E40AF',
     },
+    inputContainer: {
+        marginBottom: 16,
+    },
     input: {
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
@@ -240,16 +285,17 @@ const styles = StyleSheet.create({
         color: '#1F2937',
         borderWidth: 1,
         borderColor: '#D1D5DB',
-        marginBottom: 16,
     },
-    passwordContainer: {
+    inputError: {
+      borderColor: '#DC2626',
+    },
+    passwordWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
         borderRadius: 8,
         borderWidth: 1,
         borderColor: '#D1D5DB',
-        marginBottom: 24,
     },
     passwordInput: {
         flex: 1,
@@ -267,6 +313,7 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
+        marginTop: 8,
     },
     registerButtonDisabled: {
         backgroundColor: '#9DB2BF',
@@ -277,6 +324,13 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     errorText: {
+        color: '#DC2626',
+        fontFamily: 'Inter-Regular',
+        marginTop: 4,
+        marginLeft: 4,
+        fontSize: 12,
+    },
+    formErrorText: {
         color: '#DC2626',
         fontFamily: 'Inter-Regular',
         textAlign: 'center',

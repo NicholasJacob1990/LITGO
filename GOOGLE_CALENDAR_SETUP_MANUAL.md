@@ -1,103 +1,103 @@
-# 🗓️ Configuração Manual do Google Calendar API
+# Guia de Configuração Manual para OAuth do Google Calendar
 
-Como o comando `gcloud alpha oauth` está apresentando problemas, vamos configurar manualmente pelo Console Web.
+Este guia detalha os passos para criar as credenciais necessárias para integrar o LITGO5 com o Google Calendar.
 
-## ✅ Já Concluído
-- ✅ Projeto criado: `litgo5-nicholasjacob`
-- ✅ Faturamento vinculado
-- ✅ APIs habilitadas:
-  - `calendar-json.googleapis.com` (Google Calendar API)
-  - `identitytoolkit.googleapis.com` (Identity Toolkit)
-  - `iamcredentials.googleapis.com` (IAM Credentials)
+## Passo 1: Configurar um Projeto no Google Cloud Platform
 
-## 📋 Próximos Passos (Manual)
+1.  **Acesse o [Google Cloud Console](https://console.cloud.google.com/)**.
+2.  Crie um novo projeto ou selecione um existente.
+    *   Clique no seletor de projetos no topo da página.
+    *   Clique em **"Novo projeto"**.
+    *   Dê um nome ao projeto (ex: `LITGO5-App`) e clique em **"Criar"**.
 
-### 1. Acessar o Google Cloud Console
-Abra: https://console.cloud.google.com/
+## Passo 2: Ativar a API do Google Calendar
 
-### 2. Selecionar o Projeto
-- Certifique-se de que está no projeto: **litgo5-nicholasjacob**
+1.  No menu de navegação, vá para **"APIs e serviços"** > **"Biblioteca"**.
+2.  Procure por **"Google Calendar API"**.
+3.  Selecione a API e clique em **"Ativar"**.
 
-### 3. Configurar OAuth Consent Screen
-1. Vá para: **APIs & Services** → **OAuth consent screen**
-2. Escolha **External** (para permitir qualquer usuário Google)
-3. Preencha:
-   - **App name**: LITGO5 Mobile
-   - **User support email**: nicholasjacob90@gmail.com
-   - **Developer contact email**: nicholasjacob90@gmail.com
-4. Clique **Save and Continue**
-5. Em **Scopes**, adicione:
-   - `https://www.googleapis.com/auth/calendar`
-   - `https://www.googleapis.com/auth/calendar.events`
-6. **Save and Continue** até o final
+## Passo 3: Configurar a Tela de Consentimento OAuth
 
-### 4. Criar Credentials
-1. Vá para: **APIs & Services** → **Credentials**
-2. Clique **+ CREATE CREDENTIALS** → **OAuth 2.0 Client IDs**
+Esta tela é o que os usuários veem quando autorizam o acesso à sua conta Google.
 
-#### 4.1 Client ID para iOS
-1. **Application type**: iOS
-2. **Name**: LITGO5 - iOS
-3. **Bundle ID**: `com.anonymous.boltexponativewind`
-4. Clique **CREATE**
-5. **Copie o Client ID** (formato: `xxxxx.apps.googleusercontent.com`)
+1.  No menu, vá para **"APIs e serviços"** > **"Tela de consentimento OAuth"**.
+2.  Selecione o tipo de usuário **"Externo"** e clique em **"Criar"**.
+3.  **Preencha as informações do aplicativo:**
+    *   **Nome do app:** LITGO5
+    *   **E-mail de suporte do usuário:** (seu e-mail)
+    *   **Logotipo do app:** (opcional)
+    *   **Informações de contato do desenvolvedor:** (seu e-mail)
+4.  Clique em **"Salvar e continuar"**.
+5.  **Escopos:**
+    *   Clique em **"Adicionar ou remover escopos"**.
+    *   Filtre por **"Google Calendar API"**.
+    *   Selecione os seguintes escopos:
+        *   `.../auth/calendar`
+        *   `.../auth/calendar.events`
+    *   Clique em **"Atualizar"**.
+6.  Clique em **"Salvar e continuar"**.
+7.  **Usuários de teste:**
+    *   Clique em **"Adicionar usuários"**.
+    *   Adicione o endereço de e-mail da conta Google que você usará para testar a integração.
+    *   Clique em **"Adicionar"**.
+8.  Clique em **"Salvar e continuar"** e depois em **"Voltar para o painel"**.
 
-#### 4.2 Client ID para Web (Expo)
-1. **Application type**: Web application
-2. **Name**: LITGO5 - Expo (Web)
-3. **Authorized redirect URIs**: 
-   - `https://auth.expo.io/@SEU_EXPO_USERNAME/litgo5`
-   - (Substitua `SEU_EXPO_USERNAME` pelo seu username do Expo)
-4. Clique **CREATE**
-5. **Copie o Client ID e Client Secret**
+## Passo 4: Criar as Credenciais de Cliente OAuth 2.0
 
-## 🔧 Configurar no Código
+Você precisará de três credenciais diferentes: uma para **iOS**, uma para **Android** e uma para **Web**.
 
-Após obter as credenciais, edite `lib/services/calendar.ts`:
+### 1. Credencial para iOS
 
-```typescript
-export const useGoogleAuth = () => {
-  const redirectUri = makeRedirectUri({
-    scheme: 'com.anonymous.boltexponativewind',
-    path: 'redirect'
-  });
-  
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: 'SEU_IOS_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: 'SEU_WEB_CLIENT_ID.apps.googleusercontent.com',
-    scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events'],
-    clientSecret: 'SEU_WEB_CLIENT_SECRET',
-    redirectUri,
-  });
+1.  No menu, vá para **"APIs e serviços"** > **"Credenciais"**.
+2.  Clique em **"Criar credenciais"** > **"ID do cliente OAuth"**.
+3.  Selecione **"iOS"** como tipo de aplicativo.
+4.  **ID do pacote:** `com.anonymous.boltexponativewind` (Este é o valor do `ios.bundleIdentifier` no seu `app.json`).
+5.  Clique em **"Criar"**.
+6.  **Copie o "ID do cliente iOS"**. Você precisará dele.
 
-  return { request, response, promptAsync, redirectUri };
-};
-```
+### 2. Credencial para Android
 
-## 🚀 Testar a Integração
+1.  Volte para a tela de **"Credenciais"**.
+2.  Clique em **"Criar credenciais"** > **"ID do cliente OAuth"**.
+3.  Selecione **"Android"** como tipo de aplicativo.
+4.  **Nome do pacote:** `com.anonymous.boltexponativewind` (Este é o valor do `android.package` no seu `app.json`).
+5.  **Impressão digital do certificado de assinatura SHA-1:**
+    *   No seu terminal, no diretório do projeto, execute:
+        ```bash
+        npx expo-cli fetch:android:hashes
+        ```
+    *   Ou, se você tem um build local, use o `keytool`:
+        ```bash
+        keytool -list -v -keystore ./android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android
+        ```
+    *   Copie o valor da **"Impressão digital do certificado SHA1"** e cole no campo.
+6.  Clique em **"Criar"**.
+7.  **Copie o "ID do cliente Android"**. Você precisará dele.
 
-1. Substitua as credenciais no código
-2. Execute: `npx expo start`
-3. Abra a tela "Agenda" no app
-4. Toque em "Conectar Google Calendar"
-5. Complete o fluxo de autorização
+### 3. Credencial para Web
 
-## 📝 Variáveis de Ambiente (Recomendado)
+1.  Volte para a tela de **"Credenciais"**.
+2.  Clique em **"Criar credenciais"** > **"ID do cliente OAuth"**.
+3.  Selecione **"Aplicativo da Web"** como tipo de aplicativo.
+4.  **Nome:** `LITGO5 Web Client`
+5.  **URIs de redirecionamento autorizados:**
+    *   Clique em **"ADICIONAR URI"**.
+    *   Adicione os seguintes URIs (um de cada vez):
+        *   `https://auth.expo.io/@anonymous/LITGO5` (Substitua `@anonymous/LITGO5` pelo seu slug do Expo, se diferente).
+        *   `exp://127.0.0.1:8081/--/expo-auth-session` (Para testes locais com Expo Go).
+        *   Você pode precisar adicionar o IP da sua máquina também: `exp://<SEU_IP_LOCAL>:8081`
+6.  Clique em **"Criar"**.
+7.  Uma janela aparecerá com o **"ID do cliente"** e o **"Segredo do cliente"**. Copie ambos.
 
-Para maior segurança, adicione as credenciais no `.env`:
+## Passo 5: Usar as Credenciais
 
-```env
-EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=seu_ios_client_id
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=seu_web_client_id
-GOOGLE_WEB_CLIENT_SECRET=seu_web_client_secret
-```
+Agora você tem todas as chaves necessárias:
+-   ID do Cliente iOS
+-   ID do Cliente Android
+-   ID do Cliente Web
+-   Segredo do Cliente Web
 
-E use no código:
-```typescript
-iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-clientSecret: process.env.GOOGLE_WEB_CLIENT_SECRET,
-```
+Execute o script `configure_credentials.sh` no seu terminal e insira esses valores quando solicitado. O script os salvará com segurança no seu arquivo `.env`.
 
 ---
 

@@ -18,12 +18,14 @@ const CalendarContext = createContext<CalendarContextType | undefined>(undefined
 
 export const CalendarProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const userId = user?.id;
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchEvents = useCallback(async () => {
-    if (!user?.id) {
+  // Função memoizada para ser usada manualmente pelos componentes
+  const refetchEvents = useCallback(async () => {
+    if (!userId) {
       setEvents([]);
       setIsLoading(false);
       return;
@@ -33,13 +35,12 @@ export const CalendarProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
 
     try {
-      // 3. Fallback: busca eventos do nosso DB (simplificado para evitar erros)
       console.log('ℹ️ Buscando eventos do banco de dados local...');
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 1);
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1);
-      const localEvents = await getEvents(user.id, startDate, endDate);
+      const localEvents = await getEvents(userId, startDate, endDate);
       setEvents(localEvents || []);
     } catch (e) {
       console.error('Error fetching events:', e);
@@ -48,14 +49,22 @@ export const CalendarProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
+  // Carrega eventos automaticamente quando o ID do usuário estiver disponível
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+    // Somente dispara quando userId mudar (inclusive de null -> valor)
+    if (userId) {
+      refetchEvents();
+    } else {
+      // Se o usuário ainda não estiver logado, limpa os estados para evitar loops
+      setEvents([]);
+      setIsLoading(false);
+    }
+  }, [userId, refetchEvents]);
 
   return (
-    <CalendarContext.Provider value={{ events, isLoading, error, refetchEvents: fetchEvents }}>
+    <CalendarContext.Provider value={{ events, isLoading, error, refetchEvents }}>
       {children}
     </CalendarContext.Provider>
   );

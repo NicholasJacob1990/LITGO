@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import supabase from '../../lib/supabase';
+import supabase, { saveCVAnalysis } from '../../lib/supabase';
 import { Eye, EyeOff, UploadCloud, CheckCircle } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -10,7 +10,6 @@ import storageService from '../../lib/storage';
 import locationService from '../../components/LocationService';
 import { extractTextFromFile } from '../../lib/downloadUtils';
 import { analyzeLawyerCV, CVAnalysisResult } from '../../lib/openai';
-import { saveCVAnalysis } from '../../lib/supabase';
 
 const TOTAL_STEPS = 4;
 
