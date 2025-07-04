@@ -1,18 +1,31 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video, Mic, MicOff, VideoOff, Phone, MessageCircle, Settings, Users, Clock, Star } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { createVideoConsultation, getVideoSession } from '@/lib/services/video';
+import VideoCall from '@/components/VideoCall';
 
 export default function VideoConsultationScreen() {
-  const { lawyerId, caseId } = useLocalSearchParams<{ lawyerId: string, caseId: string }>();
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
+  const { lawyerId, caseId, sessionId } = useLocalSearchParams<{ 
+    lawyerId: string; 
+    caseId: string;
+    sessionId?: string;
+  }>();
+  const { user } = useAuth();
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [videoData, setVideoData] = useState<{
+    roomUrl: string;
+    token: string;
+    sessionId: string;
+    participantName: string;
+  } | null>(null);
 
-  // Mock lawyer data
+  // Mock lawyer data - em produção, buscar do banco de dados
   const lawyer = {
     id: lawyerId,
     name: 'Dr. Carlos Mendes',
@@ -22,43 +35,82 @@ export default function VideoConsultationScreen() {
   };
 
   useEffect(() => {
-    // Timer para duração da chamada
-    const timer = setInterval(() => {
-      setCallDuration(prev => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
+    initializeVideoCall();
   }, []);
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const initializeVideoCall = async () => {
+    if (!user || !lawyerId) {
+      setError('Dados insuficientes para iniciar a videochamada');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      let videoSession;
+      
+      if (sessionId) {
+        // Se já temos um sessionId, buscar a sessão existente
+        videoSession = await getVideoSession(sessionId);
+        if (!videoSession) {
+          throw new Error('Sessão de vídeo não encontrada');
+        }
+      } else {
+        // Criar nova consulta de vídeo
+        const consultation = await createVideoConsultation(
+          user.id,
+          lawyerId,
+          caseId
+        );
+        videoSession = consultation.session;
+        
+        // Determinar qual token usar baseado no tipo de usuário
+        const isLawyer = user.user_metadata?.role === 'lawyer';
+        const token = isLawyer ? consultation.lawyerToken : consultation.clientToken;
+        
+        setVideoData({
+          roomUrl: consultation.room.url,
+          token: token,
+          sessionId: consultation.session.id,
+          participantName: user.user_metadata?.full_name || 'Usuário',
+        });
+      }
+      
+    } catch (err) {
+      console.error('Erro ao inicializar videochamada:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao inicializar videochamada');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleToggleMute = () => {
-    setIsMuted(!isMuted);
-    // Aqui seria implementada a lógica do Daily para mute/unmute
+  const handleCallEnd = () => {
+    // Navegar de volta para a tela anterior
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/chat');
+    }
   };
 
-  const handleToggleVideo = () => {
-    setIsVideoOff(!isVideoOff);
-    // Aqui seria implementada a lógica do Daily para video on/off
-  };
-
-  const handleEndCall = () => {
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
     Alert.alert(
-      'Encerrar Chamada',
-      'Tem certeza que deseja encerrar a chamada?',
+      'Erro na Videochamada',
+      errorMessage,
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Encerrar', 
-          style: 'destructive',
+        {
+          text: 'Tentar Novamente',
           onPress: () => {
-            // Aqui seria implementada a lógica do Daily para encerrar
-            router.replace('/(tabs)/chat');
+            setError(null);
+            initializeVideoCall();
           }
+        },
+        {
+          text: 'Voltar',
+          style: 'cancel',
+          onPress: handleCallEnd
         }
       ]
     );
@@ -72,329 +124,172 @@ export default function VideoConsultationScreen() {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Continuar', 
-          onPress: () => router.replace('/(tabs)/chat')
+          onPress: () => {
+            // Encerrar videochamada e ir para chat
+            router.replace('/(tabs)/chat');
+          }
         }
       ]
     );
   };
 
-  const handleToggleRecording = () => {
-    if (isRecording) {
-      Alert.alert(
-        'Parar Gravação',
-        'Deseja parar a gravação da consulta?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Parar', 
-            onPress: () => setIsRecording(false)
-          }
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Iniciar Gravação',
-        'A gravação será iniciada. Todos os participantes serão notificados.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Iniciar', 
-            onPress: () => setIsRecording(true)
-          }
-        ]
-      );
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* Video Container */}
-      <View style={styles.videoContainer}>
-        {/* Main Video (Lawyer) */}
-        <View style={styles.mainVideo}>
-          <View style={styles.videoPlaceholder}>
-            <Video size={48} color="#FFFFFF" />
-            <Text style={styles.videoPlaceholderText}>Dr. Carlos Mendes</Text>
-          </View>
-          
-          {/* Recording Indicator */}
-          {isRecording && (
-            <View style={styles.recordingIndicator}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>GRAVANDO</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Self Video (User) */}
-        <View style={styles.selfVideo}>
-          <View style={styles.selfVideoPlaceholder}>
-            <Text style={styles.selfVideoText}>Você</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Call Info */}
-      <View style={styles.callInfo}>
-        <View style={styles.lawyerInfo}>
-          <Text style={styles.lawyerName}>{lawyer.name}</Text>
-          <Text style={styles.lawyerSpecialty}>{lawyer.specialty}</Text>
-          <View style={styles.lawyerStats}>
-            <Star size={16} color="#F59E0B" fill="#F59E0B" />
-            <Text style={styles.lawyerRating}>{lawyer.rating}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.callDuration}>
-          <Clock size={16} color="#FFFFFF" />
-          <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
-        </View>
-      </View>
-
-      {/* Controls */}
-      <View style={styles.controls}>
-        <View style={styles.controlRow}>
-          {/* Mute Button */}
-          <TouchableOpacity 
-            style={[styles.controlButton, isMuted && styles.controlButtonActive]} 
-            onPress={handleToggleMute}
-          >
-            {isMuted ? <MicOff size={24} color="#FFFFFF" /> : <Mic size={24} color="#FFFFFF" />}
-          </TouchableOpacity>
-
-          {/* Video Button */}
-          <TouchableOpacity 
-            style={[styles.controlButton, isVideoOff && styles.controlButtonActive]} 
-            onPress={handleToggleVideo}
-          >
-            {isVideoOff ? <VideoOff size={24} color="#FFFFFF" /> : <Video size={24} color="#FFFFFF" />}
-          </TouchableOpacity>
-
-          {/* End Call Button */}
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.endCallButton]} 
-            onPress={handleEndCall}
-          >
-            <Phone size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {/* Switch to Chat */}
-          <TouchableOpacity 
-            style={styles.controlButton} 
-            onPress={handleSwitchToChat}
-          >
-            <MessageCircle size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {/* Settings */}
-          <TouchableOpacity style={styles.controlButton}>
-            <Settings size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Recording Control */}
-        <TouchableOpacity 
-          style={[styles.recordingButton, isRecording && styles.recordingButtonActive]} 
-          onPress={handleToggleRecording}
-        >
-          <Text style={[styles.recordingButtonText, isRecording && styles.recordingButtonTextActive]}>
-            {isRecording ? 'Parar Gravação' : 'Iniciar Gravação'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* AI Copilot Indicator */}
-      <View style={styles.aiCopilotIndicator}>
-        <Text style={styles.aiCopilotText}>
-          🤖 IA Copilot ativo - Sugerindo documentos e jurisprudência
+  // Tela de loading
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Preparando videochamada...</Text>
+        <Text style={styles.loadingSubtext}>
+          Conectando com {lawyer.name}
         </Text>
       </View>
+    );
+  }
+
+  // Tela de erro
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <StatusBar style="light" />
+        <Text style={styles.errorText}>❌ {error}</Text>
+        <View style={styles.errorActions}>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={() => {
+              setError(null);
+              initializeVideoCall();
+            }}
+          >
+            <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={handleCallEnd}
+          >
+            <Text style={styles.backButtonText}>Voltar</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Opção de mudar para chat */}
+        <TouchableOpacity 
+          style={styles.chatFallbackButton}
+          onPress={handleSwitchToChat}
+        >
+          <MessageCircle size={20} color="#FFFFFF" />
+          <Text style={styles.chatFallbackText}>Continuar por Chat</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Renderizar videochamada
+  if (videoData) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <VideoCall
+          roomUrl={videoData.roomUrl}
+          token={videoData.token}
+          sessionId={videoData.sessionId}
+          participantName={videoData.participantName}
+          onCallEnd={handleCallEnd}
+          onError={handleError}
+        />
+      </>
+    );
+  }
+
+  // Fallback
+  return (
+    <View style={styles.errorContainer}>
+      <StatusBar style="light" />
+      <Text style={styles.errorText}>Dados da videochamada não disponíveis</Text>
+      <TouchableOpacity style={styles.backButton} onPress={handleCallEnd}>
+        <Text style={styles.backButtonText}>Voltar</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#000000',
-  },
-  videoContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  mainVideo: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1F2937',
-    borderRadius: 12,
-    padding: 40,
-  },
-  videoPlaceholderText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  recordingIndicator: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    marginRight: 6,
-  },
-  recordingText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 12,
-  },
-  selfVideo: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 120,
-    height: 90,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  selfVideoPlaceholder: {
-    flex: 1,
-    backgroundColor: '#374151',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selfVideoText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-  },
-  callInfo: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  lawyerInfo: {
-    flex: 1,
-  },
-  lawyerName: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    marginBottom: 2,
-  },
-  lawyerSpecialty: {
-    color: '#E5E7EB',
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  lawyerStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  lawyerRating: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-  },
-  callDuration: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  durationText: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-  },
-  controls: {
     padding: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
-  controlRow: {
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    marginTop: 20,
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    marginTop: 8,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    padding: 20,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 30,
+    fontFamily: 'Inter-Medium',
+    lineHeight: 24,
+  },
+  errorActions: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
     gap: 16,
-    marginBottom: 20,
+    marginBottom: 30,
   },
-  controlButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  controlButtonActive: {
-    backgroundColor: '#EF4444',
-  },
-  endCallButton: {
-    backgroundColor: '#EF4444',
-    transform: [{ rotate: '135deg' }],
-  },
-  recordingButton: {
-    alignSelf: 'center',
+  retryButton: {
+    backgroundColor: '#1E40AF',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 8,
   },
-  recordingButtonActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
-  recordingButtonText: {
+  retryButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
   },
-  recordingButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  aiCopilotIndicator: {
-    position: 'absolute',
-    bottom: 120,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(124, 58, 237, 0.9)',
-    paddingHorizontal: 16,
+  backButton: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 8,
   },
-  aiCopilotText: {
+  backButtonText: {
     color: '#FFFFFF',
-    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+  },
+  chatFallbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#22C55E',
+  },
+  chatFallbackText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    textAlign: 'center',
+    fontFamily: 'Inter-Medium',
   },
 }); 

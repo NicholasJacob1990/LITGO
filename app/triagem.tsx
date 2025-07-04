@@ -1,9 +1,13 @@
-import { StyleSheet, TouchableOpacity, ScrollView, View, Text, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, View, Text, Alert, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Bot, CheckCircle } from 'lucide-react-native';
+
+import { createCase, getMatches, startTriage } from '@/lib/services/api';
+import { createEmbedding } from '@/lib/openai';
+import { useTaskPolling } from '@/hooks/useTaskPolling';
 
 interface TriagemQuestion {
   id: string;
@@ -13,7 +17,11 @@ interface TriagemQuestion {
 
 export default function TriagemScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ texto_cliente?: string }>();
+
   const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<TriagemQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [analysisResult, setAnalysisResult] = useState({
@@ -21,6 +29,9 @@ export default function TriagemScreen() {
     urgencia: '',
     resumo: ''
   });
+
+  // Hook para polling da tarefa de triagem
+  const { taskResult, isLoading: isPolling, error: pollingError } = useTaskPolling(taskId);
 
   // Simula análise IA inicial
   useEffect(() => {
@@ -51,19 +62,62 @@ export default function TriagemScreen() {
     }, 3000);
   }, []);
 
+  // Efeito para lidar com a conclusão da tarefa
+  useEffect(() => {
+    if (taskResult?.status === 'completed') {
+      const caseId = taskResult.result?.result?.case_id;
+      if (caseId) {
+        // Agora que temos o case_id, buscamos os matches
+        fetchAndNavigateToMatches(caseId);
+      } else {
+        Alert.alert('Erro', 'Não foi possível obter os detalhes do caso após a triagem.');
+        setIsSubmitting(false);
+      }
+    } else if (taskResult?.status === 'failed') {
+      Alert.alert('Erro na Triagem', 'Houve um problema ao analisar seu caso. Por favor, tente novamente.');
+      setIsSubmitting(false);
+    }
+  }, [taskResult]);
+
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers({ ...answers, [questionId]: answer });
   };
 
-  const handleFinishTriagem = () => {
-    // Simula finalização da triagem e geração da síntese
-    // Simula finalização da triagem e geração da síntese
-    // Por enquanto vamos redirecionar para a tela principal
-    Alert.alert(
-      'Triagem Concluída', 
-      'Síntese jurídica gerada com sucesso! Seu caso foi encaminhado para análise de um advogado especialista.',
-      [{ text: 'OK', onPress: () => router.push('/(tabs)') }]
-    );
+  const handleFinishTriagem = async () => {
+    setIsSubmitting(true);
+    try {
+      const payload = { texto_cliente: `Relato: ${params.texto_cliente}` }; // Simplificado
+      const taskResponse = await startTriage(payload);
+      setTaskId(taskResponse.task_id); // Inicia o polling
+    } catch (error) {
+      console.error("Erro ao iniciar a triagem:", error);
+      Alert.alert(
+        'Erro', 
+        'Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.'
+      );
+      setIsSubmitting(false);
+    }
+  };
+
+  const fetchAndNavigateToMatches = async (caseId: string) => {
+    try {
+      const matches = await getMatches(caseId);
+      router.push({
+        pathname: '/MatchesPage',
+        params: { matches: JSON.stringify(matches) },
+      });
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível buscar os advogados recomendados.');
+    } finally {
+      setIsSubmitting(false);
+      setTaskId(null);
+    }
+  };
+
+  const currentStatusText = () => {
+    if (isSubmitting && !isPolling) return 'Enviando para análise...';
+    if (isPolling) return 'Processando seu caso...';
+    return 'Encontrar Advogado Ideal';
   };
 
   if (isAnalyzing) {
@@ -190,19 +244,23 @@ export default function TriagemScreen() {
         <TouchableOpacity 
           style={[
             styles.finishButton,
-            Object.keys(answers).length < questions.length && styles.finishButtonDisabled
+            (Object.keys(answers).length < questions.length || isSubmitting) && styles.finishButtonDisabled
           ]}
           onPress={handleFinishTriagem}
-          disabled={Object.keys(answers).length < questions.length}
+          disabled={Object.keys(answers).length < questions.length || isSubmitting}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={Object.keys(answers).length >= questions.length ? ['#10B981', '#059669'] : ['#9CA3AF', '#6B7280']}
+            colors={(Object.keys(answers).length >= questions.length && !isSubmitting) ? ['#10B981', '#059669'] : ['#9CA3AF', '#6B7280']}
             style={styles.finishButtonGradient}
           >
-            <Bot size={20} color="#FFFFFF" />
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Bot size={20} color="#FFFFFF" />
+            )}
             <Text style={styles.finishButtonText}>
-              Gerar Síntese Jurídica
+              {currentStatusText()}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -435,6 +493,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
+    marginLeft: 8,
   },
   disclaimer: {
     backgroundColor: '#FEF3C7',

@@ -28,7 +28,7 @@ export default function GoogleMap(props: GoogleMapProps) {
 
   // Tentar importar react-native-maps de forma segura
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const { default: MapView, Marker } = require('react-native-maps');
     
     const { lawyers, center, selectedLawyer, onLawyerSelect, onLawyerPress } = props;

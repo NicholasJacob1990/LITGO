@@ -1,18 +1,23 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Share } from 'lucide-react-native';
+import { ArrowLeft, Share , LucideIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+
+interface ActionButtonProps {
+  icon: LucideIcon;
+  onPress: () => void;
+}
 
 interface TopBarProps {
   title: string;
   subtitle?: string;
   showBack?: boolean;
-  showShare?: boolean;
+  rightActions?: ActionButtonProps[];
   onShare?: () => void;
 }
 
-export default function TopBar({ title, subtitle, showBack = false, showShare = false, onShare }: TopBarProps) {
+export default function TopBar({ title, subtitle, showBack = false, rightActions, onShare }: TopBarProps) {
   const navigation = useNavigation();
 
   const handleBack = () => {
@@ -46,7 +51,20 @@ export default function TopBar({ title, subtitle, showBack = false, showShare = 
           </View>
           
           <View style={styles.rightSection}>
-            {showShare && (
+            {rightActions && rightActions.map((action, index) => {
+              const ActionIcon = action.icon;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.iconButton}
+                  onPress={action.onPress}
+                  activeOpacity={0.7}
+                >
+                  <ActionIcon size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              );
+            })}
+            {onShare && !rightActions && (
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={onShare}
@@ -79,8 +97,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   rightSection: {
-    width: 44,
-    alignItems: 'flex-end',
+    minWidth: 44,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   titleContainer: {
     flex: 1,

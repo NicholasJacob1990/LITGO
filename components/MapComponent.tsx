@@ -1,16 +1,24 @@
 import React from 'react';
-import GoogleMap from './GoogleMap';
-// import MapboxMap from './MapboxMap'; // Futuro, se desejar alternância
+import { Platform } from 'react-native';
+
+// Importação condicional por plataforma
+const LawyerMapView = Platform.OS === 'web' 
+  ? require('./LawyerMapView.web').default 
+  : require('./LawyerMapView').default;
 
 interface MapComponentProps {
   lawyers: any[];
-  center: { latitude: number; longitude: number };
-  selectedLawyer?: any;
-  onLawyerSelect: (lawyer: any) => void;
-  onLawyerPress: (lawyer: any) => void;
+  selectedLawyer: any;
+  onSelectLawyer: (lawyer: any) => void;
+  region: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  };
+  onRegionChange: (region: any) => void;
 }
 
-export function MapComponent(props: MapComponentProps) {
-  // Alternância futura: process.env.EXPO_PUBLIC_MAP_PROVIDER === 'mapbox'
-  return <GoogleMap {...props} />;
+export default function MapComponent(props: MapComponentProps) {
+  return <LawyerMapView {...props} />;
 } 

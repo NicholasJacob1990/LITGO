@@ -9,11 +9,13 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LawyerService, Lawyer } from '@/lib/supabase';
+import { getOrCreatePreHiringChat } from '@/lib/services/chat';
 
 export default function LawyerDetailsScreen() {
   const { lawyerId } = useLocalSearchParams<{ lawyerId: string }>();
   const [lawyer, setLawyer] = useState<Lawyer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [selectedConsultationType, setSelectedConsultationType] = useState<'chat' | 'video' | 'presential'>('chat');
 
   useEffect(() => {
@@ -38,6 +40,24 @@ export default function LawyerDetailsScreen() {
       router.back();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleStartPreHiringChat = async () => {
+    if (!lawyerId) return;
+    setIsCreatingChat(true);
+    try {
+      const chat = await getOrCreatePreHiringChat(lawyerId);
+      if (chat && chat.id) {
+        router.push(`/pre-hiring-chat/${chat.id}`);
+      } else {
+        Alert.alert('Erro', 'Não foi possível iniciar a conversa. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao iniciar chat pré-contratação:', error);
+      Alert.alert('Erro', 'Ocorreu um erro ao iniciar a conversa.');
+    } finally {
+      setIsCreatingChat(false);
     }
   };
 
@@ -266,6 +286,14 @@ export default function LawyerDetailsScreen() {
             <TouchableOpacity style={styles.contactButton} onPress={() => handleContact('phone')}>
               <Phone size={20} color="#1E40AF" />
               <Text style={styles.contactButtonText}>Telefone</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.contactButton, isCreatingChat && styles.contactButtonDisabled]} 
+              onPress={handleStartPreHiringChat}
+              disabled={isCreatingChat}
+            >
+              <MessageCircle size={20} color={isCreatingChat ? '#9CA3AF' : '#3B82F6'} />
+              <Text style={styles.contactButtonText}>{isCreatingChat ? 'Abrindo...' : 'Conversar'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.contactButton} onPress={() => handleContact('email')}>
               <Mail size={20} color="#059669" />
@@ -585,14 +613,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   contactButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 16,
-    borderRadius: 12,
     gap: 8,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  contactButtonDisabled: {
+    backgroundColor: '#E5E7EB',
   },
   contactButtonText: {
     fontFamily: 'Inter-SemiBold',

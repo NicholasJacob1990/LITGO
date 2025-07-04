@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Star, MapPin, Award, MessageCircle, Video, Users, ArrowRight } from 'lucide-react-native';
 import { LawyerSearchResult } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 
 interface LawyerCardProps {
   lawyer: LawyerSearchResult;
@@ -9,6 +10,8 @@ interface LawyerCardProps {
 }
 
 const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
+  const router = useRouter();
+
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A';
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -83,7 +86,19 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
             </TouchableOpacity>
           )}
           {lawyer.consultation_types?.includes('video') && (
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              activeOpacity={0.7}
+              onPress={() => {
+                // Navegar para videochamada
+                router.push({
+                  pathname: '/(tabs)/video-consultation',
+                  params: { 
+                    lawyerId: lawyer.id
+                  }
+                });
+              }}
+            >
               <Video size={20} color="#006CFF" />
             </TouchableOpacity>
           )}

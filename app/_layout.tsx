@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack , SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts } from 'expo-font';
@@ -9,10 +9,20 @@ import {
   Inter_600SemiBold,
   Inter_700Bold
 } from '@expo-google-fonts/inter';
-import { SplashScreen } from 'expo-router';
+import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { CalendarProvider } from '@/lib/contexts/CalendarContext';
+import { TasksProvider } from '@/lib/contexts/TasksContext';
+import { SupportProvider } from '@/lib/contexts/SupportContext';
+// import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
+
+function AppSetup() {
+  // Comentado temporariamente para testes no Expo Go
+  // usePushNotifications();
+  return null;
+}
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -35,15 +45,21 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="lawyer-onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="admin" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
+    <AuthProvider>
+      <CalendarProvider>
+        <TasksProvider>
+          <SupportProvider>
+            <AppSetup />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+              <Stack.Screen name="lawyer-onboarding" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </SupportProvider>
+        </TasksProvider>
+      </CalendarProvider>
+    </AuthProvider>
   );
 }

@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { ArrowLeft, MessageCircle, Video, Phone, FileText, Calendar, DollarSign, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Video, Phone, FileText, Calendar, DollarSign, AlertTriangle, CheckSquare } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { mockCases, mockDetailedData } from './MyCasesList';
+import { getCaseById } from '@/lib/services/cases';
+import { shareCaseInfo, shareCaseReport } from '@/lib/services/sharing';
 import PreAnalysisCard from '@/components/organisms/PreAnalysisCard';
 import CaseCard from '@/components/organisms/CaseCard';
 import CostRiskCard from '@/components/organisms/CostRiskCard';
@@ -14,11 +16,15 @@ import Badge from '@/components/atoms/Badge';
 import ProgressBar from '@/components/atoms/ProgressBar';
 import MoneyTile from '@/components/atoms/MoneyTile';
 import StepItem from '@/components/molecules/StepItem';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function CaseDetail() {
   const route = useRoute<any>();
   const navigation = useNavigation();
+  const router = useRouter();
   const { caseId } = route.params;
+  const { role } = useAuth();
   
   const caseData = mockCases.find(c => c.id === caseId);
   const detailedData = mockDetailedData[caseId as keyof typeof mockDetailedData];
@@ -47,7 +53,7 @@ export default function CaseDetail() {
         title="Detalhes do Caso" 
         showBack 
         showShare 
-        onShare={() => console.log('Share case')}
+        onShare={() => shareCaseInfo(caseData)}
       />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -56,8 +62,8 @@ export default function CaseDetail() {
           <CaseCard
             {...caseData}
             onPress={() => {}}
-            onViewSummary={() => console.log('View summary')}
-            onChat={() => console.log('Open chat')}
+            onViewSummary={() => navigation.navigate('AISummary', { caseId })}
+            onChat={() => navigation.navigate('CaseChat', { caseId })}
           />
         </View>
 
@@ -66,8 +72,8 @@ export default function CaseDetail() {
           <View style={styles.section}>
             <PreAnalysisCard
               {...detailedData.preAnalysis}
-              onViewFull={() => console.log('View full analysis')}
-              onScheduleConsult={() => console.log('Schedule consultation')}
+              onViewFull={() => navigation.navigate('AISummary', { caseId })}
+              onScheduleConsult={() => navigation.navigate('ScheduleConsult', { caseId })}
             />
           </View>
         )}
@@ -101,7 +107,10 @@ export default function CaseDetail() {
               </View>
               
               <View style={styles.lawyerActions}>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate('CaseChat', { caseId })}
+                >
                   <MessageCircle size={20} color="#006CFF" />
                   <Text style={styles.actionButtonText}>Chat</Text>
                   {caseData.unreadMessages > 0 && (
@@ -111,15 +120,40 @@ export default function CaseDetail() {
                   )}
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => {
+                    // Navegar para videochamada com dados do caso
+                    router.push({
+                      pathname: '/(tabs)/video-consultation',
+                      params: { 
+                        lawyerId: caseData.lawyer_id,
+                        caseId: caseId
+                      }
+                    });
+                  }}
+                >
                   <Video size={20} color="#006CFF" />
                   <Text style={styles.actionButtonText}>Vídeo</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => Alert.alert('Ligação', 'Funcionalidade em desenvolvimento')}
+                >
                   <Phone size={20} color="#006CFF" />
                   <Text style={styles.actionButtonText}>Ligar</Text>
                 </TouchableOpacity>
+                
+                {role === 'lawyer' && (
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => router.push(`/(tabs)/cases/CaseTasks?caseId=${caseId}`)}
+                  >
+                    <CheckSquare size={20} color="#006CFF" />
+                    <Text style={styles.actionButtonText}>Tarefas</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>

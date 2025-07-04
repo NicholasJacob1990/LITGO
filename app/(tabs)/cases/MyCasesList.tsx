@@ -1,12 +1,21 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
-import { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { getUserCases, getCaseStats, CaseData } from '@/lib/services/cases';
+import { getUnreadMessagesCount } from '@/lib/services/chat';
 import CaseCard from '@/components/organisms/CaseCard';
 import PreAnalysisCard from '@/components/organisms/PreAnalysisCard';
 import CaseHeader from '@/components/organisms/CaseHeader';
 import Badge from '@/components/atoms/Badge';
 import FabNewCase from '@/components/layout/FabNewCase';
+import EmptyState from '@/components/atoms/EmptyState';
+import ErrorState from '@/components/atoms/ErrorState';
+import LoadingSpinner from '@/components/atoms/LoadingSpinner';
+import SearchBar from '@/components/molecules/SearchBar';
+import FilterModal from '@/components/molecules/FilterModal';
+import { Briefcase, Plus, SortAsc, SortDesc } from 'lucide-react-native';
 
 // Sample data with proper typing
 const mockCases = [
@@ -188,8 +197,79 @@ const HEADER_HEIGHT = 220; // Approximate height of CaseHeader + Filters
 
 export default function MyCasesList() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (user?.id) {
+      loadCases();
+    }
+  }, [user?.id]);
+
+  const loadCases = async () => {
+    try {
+      setLoading(true);
+      const [casesData, statsData] = await Promise.all([
+        getUserCases(user?.id || ''),
+        getCaseStats(user?.id || '')
+      ]);
+
+      // Enriquecer casos com contagem de mensagens não lidas
+      const enrichedCases = await Promise.all(
+        casesData.map(async (caseItem) => {
+          try {
+            const unreadCount = await getUnreadMessagesCount(caseItem.id, user?.id || '');
+            return {
+              ...caseItem,
+              unread_messages: unreadCount,
+              // Mapear status do backend para os esperados pela interface
+              status: mapBackendStatus(caseItem.status),
+              // Extrair informações da análise IA se disponível
+              title: caseItem.ai_analysis?.title || 'Caso sem título',
+              description: caseItem.ai_analysis?.description || 'Descrição não disponível',
+              priority: caseItem.ai_analysis?.priority || 'medium',
+              client_type: caseItem.ai_analysis?.client_type || 'PF'
+            };
+          } catch (error) {
+            console.warn('Error getting unread count for case:', caseItem.id, error);
+            return caseItem;
+          }
+        })
+      );
+
+      setCases(enrichedCases);
+      setCaseStats(statsData);
+    } catch (error) {
+      console.error('Error loading cases:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os casos');
+      // Fallback para dados mock em caso de erro
+      setCases(mockCases);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadCases();
+    setRefreshing(false);
+  };
+
+  const mapBackendStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending_assignment': 'pending',
+      'assigned': 'active',
+      'in_progress': 'active',
+      'closed': 'completed',
+      'cancelled': 'completed'
+    };
+    return statusMap[status] || status;
+  };
 
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, HEADER_HEIGHT],
@@ -204,24 +284,30 @@ export default function MyCasesList() {
   });
 
   const filters = [
-    { id: 'all', label: 'Todos', count: mockCases.length },
-    { id: 'active', label: 'Ativos', count: mockCases.filter(c => c.status === 'active').length },
-    { id: 'pending', label: 'Pendentes', count: mockCases.filter(c => c.status === 'pending').length },
-    { id: 'summary_generated', label: 'Pré-análise', count: mockCases.filter(c => c.status === 'summary_generated').length },
-    { id: 'completed', label: 'Concluídos', count: mockCases.filter(c => c.status === 'completed').length },
+    { id: 'all', label: 'Todos', count: cases.length },
+    { id: 'active', label: 'Ativos', count: cases.filter(c => c.status === 'active').length },
+    { id: 'pending', label: 'Pendentes', count: cases.filter(c => c.status === 'pending').length },
+    { id: 'summary_generated', label: 'Pré-análise', count: cases.filter(c => c.status === 'summary_generated').length },
+    { id: 'completed', label: 'Concluídos', count: cases.filter(c => c.status === 'completed').length },
   ];
 
   const filteredCases = activeFilter === 'all' 
-    ? mockCases 
-    : mockCases.filter(case_ => case_.status === activeFilter);
+    ? cases 
+    : cases.filter(case_ => case_.status === activeFilter);
 
   // Calculate case statistics for the header
-  const caseStats = [
-    { key: 'triagem', label: 'Em Triagem', count: mockCases.filter(c => c.status === 'summary_generated').length },
-    { key: 'atribuido', label: 'Atribuído', count: mockCases.filter(c => c.status === 'active').length },
-    { key: 'pagamento', label: 'Pagamento', count: 0 }, // No cases with this status in mock data
-    { key: 'atendimento', label: 'Atendimento', count: mockCases.filter(c => c.status === 'pending').length },
-    { key: 'finalizado', label: 'Finalizado', count: mockCases.filter(c => c.status === 'completed').length },
+  const headerStats = caseStats ? [
+    { key: 'triagem', label: 'Em Triagem', count: caseStats.pending_assignment },
+    { key: 'atribuido', label: 'Atribuído', count: caseStats.assigned },
+    { key: 'pagamento', label: 'Pagamento', count: 0 },
+    { key: 'atendimento', label: 'Atendimento', count: caseStats.in_progress },
+    { key: 'finalizado', label: 'Finalizado', count: caseStats.closed },
+  ] : [
+    { key: 'triagem', label: 'Em Triagem', count: cases.filter(c => c.status === 'summary_generated').length },
+    { key: 'atribuido', label: 'Atribuído', count: cases.filter(c => c.status === 'active').length },
+    { key: 'pagamento', label: 'Pagamento', count: 0 },
+    { key: 'atendimento', label: 'Atendimento', count: cases.filter(c => c.status === 'pending').length },
+    { key: 'finalizado', label: 'Finalizado', count: cases.filter(c => c.status === 'completed').length },
   ];
 
   const handleCasePress = (caseId: string) => {
@@ -229,22 +315,27 @@ export default function MyCasesList() {
   };
 
   const handleViewSummary = (caseId: string) => {
-    console.log('View AI Summary for case:', caseId);
-    // Navigate to summary screen or show modal
+    navigation.navigate('AISummary', { caseId });
   };
 
   const handleChat = (caseId: string) => {
-    console.log('Open chat for case:', caseId);
-    // Navigate to chat screen
+    navigation.navigate('CaseChat', { caseId });
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }], opacity: headerOpacity }]}>
-        {/* Enhanced Header */}
-        <CaseHeader caseStats={caseStats} totalCases={mockCases.length} />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#006CFF" />
+          <Text style={styles.loadingText}>Carregando casos...</Text>
+        </View>
+      ) : (
+        <>
+          <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }], opacity: headerOpacity }]}>
+            {/* Enhanced Header */}
+            <CaseHeader caseStats={headerStats} totalCases={cases.length} />
 
         {/* Filters */}
         <View style={styles.filtersWrapper}>
@@ -280,17 +371,20 @@ export default function MyCasesList() {
         </View>
       </Animated.View>
 
-      {/* Cases List */}
-      <Animated.ScrollView 
-        style={styles.content}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: HEADER_HEIGHT + 24 }} // Adjust paddingTop to account for absolute header
-      >
+          {/* Cases List */}
+          <Animated.ScrollView 
+            style={styles.content}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: true }
+            )}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            contentContainerStyle={{ paddingTop: HEADER_HEIGHT + 24 }} // Adjust paddingTop to account for absolute header
+          >
         {/* AI Pre-Analysis Card (if any case has summary_generated status) */}
         {activeFilter === 'summary_generated' && (
           <PreAnalysisCard
@@ -311,19 +405,21 @@ export default function MyCasesList() {
           />
         ))}
 
-        {/* Empty State */}
-        {filteredCases.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateTitle}>Nenhum caso encontrado</Text>
-            <Text style={styles.emptyStateDescription}>
-              {activeFilter === 'all' 
-                ? 'Você ainda não possui casos. Inicie uma nova consulta jurídica!' 
-                : `Não há casos com status "${filters.find(f => f.id === activeFilter)?.label}".`}
-            </Text>
-          </View>
-        )}
-      </Animated.ScrollView>
-      <FabNewCase />
+            {/* Empty State */}
+            {filteredCases.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>Nenhum caso encontrado</Text>
+                <Text style={styles.emptyStateDescription}>
+                  {activeFilter === 'all' 
+                    ? 'Você ainda não possui casos. Inicie uma nova consulta jurídica!' 
+                    : `Não há casos com status "${filters.find(f => f.id === activeFilter)?.label}".`}
+                </Text>
+              </View>
+            )}
+          </Animated.ScrollView>
+          <FabNewCase />
+        </>
+      )}
     </View>
   );
 }
@@ -335,6 +431,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 16,
   },
   header: {
     position: 'absolute',

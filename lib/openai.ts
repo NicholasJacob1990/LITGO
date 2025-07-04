@@ -387,4 +387,46 @@ Termine a entrevista quando tiver informações suficientes sobre:
       nextQuestion: "Desculpe, tive um problema para processar. Pode reformular sua última resposta?"
     };
   }
+}
+
+/**
+ * Gera um vetor de embedding para um texto usando a API da OpenAI.
+ *
+ * @param text - O texto a ser transformado em embedding.
+ * @returns Um array de números representando o vetor de embedding.
+ */
+export async function createEmbedding(text: string): Promise<number[]> {
+  if (!API_KEY) {
+    throw new Error("API key da OpenAI não configurada");
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small', // Modelo recomendado para custo/benefício
+        input: text.replace(/\\n/g, ' '), // Limpa o texto
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('OpenAI Embedding API error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message}`);
+    }
+
+    const data = await response.json();
+    if (data.data && data.data.length > 0) {
+      return data.data[0].embedding;
+    } else {
+      throw new Error('Nenhum embedding retornado pela API da OpenAI.');
+    }
+  } catch (error) {
+    console.error("❌ ERRO ao gerar embedding:", error);
+    throw new Error("Erro ao gerar embedding. Tente novamente.");
+  }
 } 

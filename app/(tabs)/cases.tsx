@@ -1,23 +1,19 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import MyCasesList from './cases/MyCasesList';
-import CaseDetail from './cases/CaseDetail';
-import NewCase from '../NewCase';
-import CaseDocuments from './cases/CaseDocuments';
+import { View, ActivityIndicator } from 'react-native';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import ClientCasesScreen from './cases/ClientCasesScreen';
+import LawyerCasesScreen from './cases/LawyerCasesScreen';
 
-const Stack = createStackNavigator();
+export default function CasesRouter() {
+  const { role, isLoading } = useAuth();
 
-export default function CasesScreen() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="MyCasesList" component={MyCasesList} />
-      <Stack.Screen name="CaseDetail" component={CaseDetail} />
-      <Stack.Screen name="CaseDocuments" component={CaseDocuments} />
-      <Stack.Screen name="NewCase" component={NewCase} />
-    </Stack.Navigator>
-  );
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+      </View>
+    );
+  }
+
+  return role === 'lawyer' ? <LawyerCasesScreen /> : <ClientCasesScreen />;
 }

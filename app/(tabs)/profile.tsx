@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { User, Settings, Bell, Shield, CreditCard, Star, FileText, LogOut, ChevronRight, CreditCard as Edit3, Building2, Scale } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Link } from 'expo-router';
 
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -190,20 +191,42 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configurações</Text>
           
-          {menuItems.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
-                <item.icon size={20} color={item.color} />
-              </View>
-              
-              <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-              
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          ))}
+          {menuItems.map((item) => {
+            // Se for o item de configurações, usar Link, caso contrário TouchableOpacity
+            if (item.id === 'settings') {
+              return (
+                <Link href="/configuracoes" asChild key={item.id}>
+                  <TouchableOpacity style={styles.menuItem}>
+                    <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
+                      <item.icon size={20} color={item.color} />
+                    </View>
+                    
+                    <View style={styles.menuContent}>
+                      <Text style={styles.menuTitle}>{item.title}</Text>
+                      <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                    </View>
+                    
+                    <ChevronRight size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </Link>
+              );
+            }
+            
+            return (
+              <TouchableOpacity key={item.id} style={styles.menuItem}>
+                <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
+                  <item.icon size={20} color={item.color} />
+                </View>
+                
+                <View style={styles.menuContent}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+                
+                <ChevronRight size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Logout Button */}
