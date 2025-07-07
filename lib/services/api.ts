@@ -299,5 +299,12 @@ export function getMatchesForCase(
 // Reexporta para facilitar importação em outras partes do app
 export type { Match as MatchResult };
 
-// Exporta tipo Match diretamente
-export type { Match }; 
+const api = {
+  get: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'GET' }),
+  post: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
+  patch: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
+  put: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+  delete: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'DELETE' }),
+};
+
+export default api; 

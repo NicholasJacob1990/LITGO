@@ -14,10 +14,11 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 
-import ContractCard from '../../components/organisms/ContractCard';
-import { Contract, contractsService } from '../../lib/services/contracts';
-import { useAuth } from '../../lib/contexts/AuthContext';
+import ContractCard from '../../../components/organisms/ContractCard';
+import { Contract, contractsService } from '../../../lib/services/contracts';
+import { useAuth } from '../../../lib/contexts/AuthContext';
 
 type FilterStatus = 'all' | 'pending-signature' | 'active' | 'closed' | 'canceled';
 

@@ -368,6 +368,9 @@ class Lawyer:
     last_offered_at: float = field(default_factory=time.time)
     casos_historicos_embeddings: List[np.ndarray] = field(default_factory=list)
     scores: Dict[str, Any] = field(default_factory=dict)
+    # v2.7 – autoridade doutrinária e reputação
+    pareceres: List[Parecer] = field(default_factory=list)
+    reconhecimentos: List[Reconhecimento] = field(default_factory=list)
     
     def __post_init__(self):
         # Inicializar campos mutáveis com valores padrão
@@ -383,6 +386,26 @@ class Lawyer:
             self.casos_historicos_embeddings = []
         if self.scores is None:
             self.scores = {}
+
+
+@dataclass(slots=True)
+class Parecer:
+    """Representa um parecer jurídico (legal opinion)."""
+    titulo: str
+    resumo: str
+    area: str
+    subarea: str
+    embedding: np.ndarray = field(default_factory=lambda: np.zeros(EMBEDDING_DIM))
+
+
+@dataclass(slots=True)
+class Reconhecimento:
+    """Ranking ou publicação especializada."""
+    tipo: Literal["ranking", "artigo", "citacao"]
+    publicacao: str
+    ano: int
+    area: str
+
 
 # =============================================================================
 # 5. Cache estático (simulado)
@@ -447,21 +470,29 @@ class FeatureCalculator:
         return 1.0 if self.case.area in self.lawyer.tags_expertise else 0.0
 
     def case_similarity(self) -> float:
-        """Case similarity ponderada por outcomes históricos."""
-        embeds = self.lawyer.casos_historicos_embeddings
-        if not embeds:
-            return 0.0
+        """(v2.7) Combina similaridade de casos práticos com pareceres técnicos."""
+        # ── 2-a) Similaridade com casos práticos ──────────────────────
+        sim_hist = 0.0
+        embeddings_hist = self.lawyer.casos_historicos_embeddings
+        if embeddings_hist:
+            sims_hist = [cosine_similarity(self.case.summary_embedding, e) for e in embeddings_hist]
+            outcomes = self.lawyer.case_outcomes
+            if outcomes and len(outcomes) == len(sims_hist):
+                weights = [1.0 if outcome else 0.8 for outcome in outcomes]
+                sim_hist = float(np.average(sims_hist, weights=weights))
+            else:
+                sim_hist = float(np.mean(sims_hist))
 
-        # Calcular similaridades
-        sims = [cosine_similarity(self.case.summary_embedding, e) for e in embeds]
+        # ── 2-b) Similaridade com pareceres ───────────────────────────
+        sim_par = 0.0
+        if self.lawyer.pareceres:
+            sims_par = [cosine_similarity(self.case.summary_embedding, p.embedding) for p in self.lawyer.pareceres]
+            sim_par = float(max(sims_par)) if sims_par else 0.0
 
-        # Pesos baseados em outcomes (vitórias têm peso maior)
-        outcomes = self.lawyer.case_outcomes
-        if outcomes and len(outcomes) == len(sims):
-            weights = [1.0 if outcome else 0.8 for outcome in outcomes]
-            return float(np.average(sims, weights=weights))
-        else:
-            return float(np.mean(sims))
+        # ── 2-c) Combinação ponderada ─────────────────────────────────
+        if sim_par == 0:
+            return sim_hist
+        return 0.6 * sim_hist + 0.4 * sim_par
 
     def success_rate(self) -> float:
         """Success rate com smoothing bayesiano e multiplicador de status (v2.3)."""
@@ -489,33 +520,51 @@ class FeatureCalculator:
         return np.clip(1 - dist / self.case.radius_km, 0, 1)
 
     def qualification_score(self) -> float:
-        """Qualificação aprimorada com CV score."""
-        # Score original baseado em experiência e títulos
+        """(v2.7) Métrica de reputação com experiência, títulos, publicações, pareceres e reconhecimentos."""
+        # ── Experiência ───────────────────────────────────────────────
         score_exp = min(1.0, self.cv.get("anos_experiencia", 0) / 25)
 
-        # Estrutura esperada: list[dict{"nivel": "lato|mestrado|doutorado",
-        # "area": "..."}]
+        # ── Títulos acadêmicos ────────────────────────────────────────
         titles: List[Dict[str, str]] = self.cv.get("pos_graduacoes", [])
         counts = {"lato": 0, "mestrado": 0, "doutorado": 0}
         for t in titles:
             level = str(t.get("nivel", "")).lower()
-            area_match = self.case.area.lower() in str(t.get("area", "")).lower()
-            if level in counts and area_match:
+            if level in counts and self.case.area.lower() in str(t.get("area", "")).lower():
                 counts[level] += 1
 
-        # Máx 2 títulos por nível
-        score_lato = min(counts["lato"], 2) / 2
-        score_mest = min(counts["mestrado"], 2) / 2
-        score_doc = min(counts["doutorado"], 2) / 2
+        score_titles = 0.1 * min(counts["lato"], 2) / 2 + \
+                       0.2 * min(counts["mestrado"], 2) / 2 + \
+                       0.3 * min(counts["doutorado"], 2) / 2
 
-        # Pesos internos: lato 0.1, mestrado 0.2, doutorado 0.3 (até 0.6 total)
-        score_titles = 0.1 * score_lato + 0.2 * score_mest + 0.3 * score_doc
-
+        # ── Publicações gerais ───────────────────────────────────────
         pubs = self.cv.get("num_publicacoes", 0)
         score_pub = min(1.0, log1p(pubs) / log1p(10))
 
-        # Score tradicional
-        base_score = 0.4 * score_exp + 0.4 * score_titles + 0.2 * score_pub
+        # ── Pareceres relevantes ─────────────────────────────────────
+        num_pareceres_rel = len([p for p in self.lawyer.pareceres if self.case.area.lower() in p.area.lower()])
+        score_par = min(1.0, log1p(num_pareceres_rel) / log1p(5))
+
+        # ── Reconhecimentos de mercado ───────────────────────────────
+        pesos_rec = {
+            "análise advocacia 500": 1.0,
+            "chambers and partners": 1.0,
+            "the legal 500": 0.9,
+            "leaders league": 0.9,
+        }
+        pontos_rec = 0.0
+        for rec in self.lawyer.reconhecimentos:
+            if self.case.area.lower() in rec.area.lower():
+                pontos_rec += pesos_rec.get(rec.publicacao.lower(), 0.4)
+        score_rec = np.clip(pontos_rec / 3.0, 0, 1)
+
+        # ── Combinação final ─────────────────────────────────────────
+        base_score = (
+            0.30 * score_exp +
+            0.25 * score_titles +
+            0.15 * score_pub +
+            0.15 * score_par +
+            0.15 * score_rec
+        )
 
         # Integração com CV score v2.2
         cv_score = self.lawyer.kpi.cv_score

@@ -6,7 +6,6 @@ import { LawyerSearchResult } from '@/lib/supabase';
 import { getExplanation , Match } from '@/lib/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import ContractForm from './organisms/ContractForm';
-import RadarChartComponent from './organisms/RadarChart';
 
 interface LawyerMatchCardProps {
   lawyer: LawyerSearchResult;
@@ -37,6 +36,11 @@ const LawyerMatchCard: React.FC<LawyerMatchCardProps> = ({ lawyer, matchData, on
       ]
     );
   };
+
+  const scoreParecer = matchData.features?.score_par || 0;
+  const simParecer = matchData.features?.sim_par || 0;
+
+  const isAutoridade = scoreParecer > 0.5 || simParecer > 0.6;
 
   return (
     <>
@@ -76,6 +80,12 @@ const LawyerMatchCard: React.FC<LawyerMatchCardProps> = ({ lawyer, matchData, on
               <Text style={styles.scoreSubtext}>Compatibilidade</Text>
             </View>
           </View>
+
+          {isAutoridade && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>⚖️ Autoridade no Assunto</Text>
+            </View>
+          )}
 
           <View style={styles.metricsRow}>
             <View style={styles.metric}>
@@ -144,8 +154,12 @@ const LawyerMatchCard: React.FC<LawyerMatchCardProps> = ({ lawyer, matchData, on
             </View>
           </TouchableOpacity>
 
-          {isExpanded && matchData.breakdown && (
-            <RadarChartComponent data={matchData.breakdown} />
+          {isExpanded && (
+            <View style={styles.explanationContainer}>
+              <Text style={styles.explanationText}>
+                Análise de compatibilidade baseada em experiência, localização, taxa de sucesso e perfil do caso.
+              </Text>
+            </View>
           )}
 
           <View style={styles.actions}>
@@ -395,6 +409,41 @@ const styles = StyleSheet.create({
     color: '#10b981',
     fontWeight: '500',
   },
+  badgeContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E0F2FE',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 12,
+  },
+  badgeText: {
+    color: '#0369A1',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  logosContainer: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  logosTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 80,
+    height: 25,
+    resizeMode: 'contain',
+    marginRight: 12,
+  }
 });
 
 export default LawyerMatchCard;

@@ -13,15 +13,8 @@ install! 'cocoapods',
 
 prepare_react_native_project!
 
-target 'boltexponativewind' do
+target 'LITGO' do
   use_expo_modules!
-  post_integrate do |installer|
-    begin
-      expo_patch_react_imports!(installer)
-    rescue => e
-      Pod::UI.warn e
-    end
-  end
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -41,11 +34,6 @@ target 'boltexponativewind' do
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
-# @generated begin pre_installer - expo prebuild (DO NOT MODIFY) sync-c8812095000d6054b846ce74840f0ffb540c2757
-  # pre_install do |installer|
-  #   $RNMapboxMaps.pre_install(installer)
-  # end
-# @generated end pre_installer
   use_react_native!(
     :path => config[:reactNativePath],
     :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
@@ -55,15 +43,6 @@ target 'boltexponativewind' do
   )
 
   post_install do |installer|
-    # installer.pods_project.targets.each do |target|
-    #   if target.name == 'rn-fetch-blob'
-    #     target.build_configurations.each do |config|
-    #       config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) "${PODS_ROOT}/../node_modules/react-native/React/**"'
-    #     end
-    #   end
-    # end
-    # Commenting out Mapbox post_install
-    # $RNMapboxMaps.post_install(installer)
     react_native_post_install(
       installer,
       config[:reactNativePath],

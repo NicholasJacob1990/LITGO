@@ -53,23 +53,25 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryProvider>
-      <AuthProvider>
-        <CalendarProvider>
-          <TasksProvider>
-            <SupportProvider>
-              <AppSetup />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                <Stack.Screen name="lawyer-onboarding" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </SupportProvider>
-          </TasksProvider>
-        </CalendarProvider>
-      </AuthProvider>
-    </QueryProvider>
+    <SafeAreaProvider>
+      <QueryProvider>
+        <AuthProvider>
+          <CalendarProvider>
+            <TasksProvider>
+              <SupportProvider>
+                <AppSetup />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="lawyer-onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </SupportProvider>
+            </TasksProvider>
+          </CalendarProvider>
+        </AuthProvider>
+      </QueryProvider>
+    </SafeAreaProvider>
   );
 }

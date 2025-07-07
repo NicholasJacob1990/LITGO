@@ -1,8 +1,7 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, RefreshControl, ScrollView } from 'react-native';
 import { Agenda, LocaleConfig } from 'react-native-calendars';
 import { Calendar as CalendarIcon, Wifi, WifiOff, RefreshCw, Plus, Settings, Trash2 } from 'lucide-react-native';
-import { useRealCalendar } from '@/lib/contexts/RealCalendarContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Configuração de localidade para português
@@ -17,16 +16,12 @@ LocaleConfig.defaultLocale = 'pt-br';
 
 export default function RealAgendaScreen() {
   const { user } = useAuth();
-  const { 
-    events, 
-    isLoading, 
-    isConnected, 
-    error, 
-    syncWithGoogle, 
-    createEvent, 
-    refetchEvents, 
-    disconnect 
-  } = useRealCalendar();
+  
+  // Estado local temporário
+  const [events, setEvents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   /**
    * Formatar eventos para o componente Agenda
@@ -144,60 +139,31 @@ export default function RealAgendaScreen() {
    */
   const handleSync = useCallback(async () => {
     try {
-      await syncWithGoogle();
+      setIsLoading(true);
+      // TODO: Implementar sincronização quando necessário
+      Alert.alert('Funcionalidade em desenvolvimento', 'A integração com Google Calendar será implementada em breve.');
     } catch (error) {
       console.error('Erro na sincronização:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [syncWithGoogle]);
+  }, []);
 
   /**
    * Lidar com refresh
    */
   const onRefresh = useCallback(async () => {
     if (isConnected) {
-      await refetchEvents();
+      // TODO: Implementar refresh quando necessário
     }
-  }, [isConnected, refetchEvents]);
+  }, [isConnected]);
 
   /**
    * Criar novo evento
    */
   const handleCreateEvent = useCallback(() => {
-    if (!isConnected) {
-      Alert.alert('Não Conectado', 'Conecte-se ao Google Calendar primeiro');
-      return;
-    }
-
-    Alert.prompt(
-      'Novo Evento',
-      'Digite o título do evento:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Criar',
-          onPress: async (title) => {
-            if (!title?.trim()) return;
-            
-            try {
-              const now = new Date();
-              const startTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora a partir de agora
-              const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hora de duração
-
-              await createEvent({
-                title: title.trim(),
-                description: 'Evento criado pelo LITGO5',
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-              });
-            } catch (error) {
-              Alert.alert('Erro', 'Falha ao criar evento');
-            }
-          }
-        }
-      ],
-      'plain-text'
-    );
-  }, [isConnected, createEvent]);
+    Alert.alert('Funcionalidade em desenvolvimento', 'A criação de eventos será implementada em breve.');
+  }, []);
 
   /**
    * Mostrar configurações
@@ -215,7 +181,7 @@ export default function RealAgendaScreen() {
             'Tem certeza que deseja desconectar do Google Calendar?',
             [
               { text: 'Cancelar', style: 'cancel' },
-              { text: 'Desconectar', style: 'destructive', onPress: disconnect }
+              { text: 'Desconectar', style: 'destructive', onPress: () => setIsConnected(false) }
             ]
           );
         }
@@ -223,11 +189,11 @@ export default function RealAgendaScreen() {
     }
 
     actions.push(
-      { text: 'Cancelar', style: 'cancel' }
+      { text: 'Cancelar', style: 'cancel' as const }
     );
 
     Alert.alert('Configurações da Agenda', '', actions);
-  }, [isConnected, disconnect]);
+  }, [isConnected]);
 
   return (
     <View style={styles.container}>

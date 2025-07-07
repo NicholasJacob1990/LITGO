@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Briefcase, User, Users, CreditCard, Gift } from 'lucide-react-native';
+import { Home, Briefcase, User, Users, CreditCard, Gift, Users2 } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
@@ -16,20 +16,20 @@ function AppTabs() {
         headerShown: false,
         tabBarActiveTintColor: PRIMARY_COLOR,
         tabBarInactiveTintColor: GREY_COLOR,
-        tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-          height: 60,
-          paddingBottom: 5,
-          paddingTop: 5,
-        },
         tabBarLabelStyle: {
-          fontFamily: 'Inter-Medium',
-          fontSize: 10,
+          fontSize: 12,
+          fontWeight: '500',
+        },
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          paddingTop: 5,
+          paddingBottom: 5,
+          height: 60,
         },
       }}
     >
+      {/* Aba Início - Visível para todos */}
       <Tabs.Screen
         name="index"
         options={{
@@ -37,6 +37,8 @@ function AppTabs() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
+      
+      {/* Aba Meus Casos - Visível para todos */}
       <Tabs.Screen
         name="cases"
         options={{
@@ -44,52 +46,65 @@ function AppTabs() {
           tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
         }}
       />
+      
+      {/* Aba Advogados - Apenas para clientes */}
+      {role === 'client' && (
+        <Tabs.Screen
+          name="advogados"
+          options={{
+            title: 'Advogados',
+            tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
+          }}
+        />
+      )}
+      
+      {/* Aba Ofertas - Apenas para advogados */}
+      {role === 'lawyer' && (
+        <Tabs.Screen
+          name="ofertas/index"
+          options={{
+            title: 'Ofertas',
+            tabBarIcon: ({ color, size }) => <Gift color={color} size={size} />,
+          }}
+        />
+      )}
+      
+      {/* Aba Financeiro - Apenas para clientes */}
+      {role === 'client' && (
+        <Tabs.Screen
+          name="financeiro/index"
+          options={{
+            title: 'Financeiro',
+            tabBarIcon: ({ color, size }) => <CreditCard color={color} size={size} />,
+          }}
+        />
+      )}
+      
+      {/* Aba Perfil - Visível para todos */}
       <Tabs.Screen
-        name="advogados"
-        options={{
-          title: 'Advogados',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
-          href: role === 'lawyer' ? null : '/(tabs)/advogados',
-        }}
-      />
-      <Tabs.Screen
-        name="financeiro"
-        options={{
-          title: 'Financeiro',
-          tabBarIcon: ({ color, size }) => <CreditCard color={color} size={size} />,
-          href: role === 'client' ? '/(tabs)/financeiro' : null,
-        }}
-      />
-      <Tabs.Screen
-        name="ofertas"
-        options={{
-          title: 'Ofertas',
-          tabBarIcon: ({ color, size }) => <Gift color={color} size={size} />,
-          href: role === 'lawyer' ? '/(tabs)/ofertas' : null,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
+        name="profile/index"
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
-
-      {/* Telas que não devem aparecer na barra de abas */}
-      <Tabs.Screen name="recommendations" options={{ href: null }} />
-      <Tabs.Screen name="contracts" options={{ href: null }} />
-      <Tabs.Screen name="agenda-real" options={{ href: null }} />
-      <Tabs.Screen name="agenda" options={{ href: null }} />
-      <Tabs.Screen name="lawyer-details" options={{ href: null }} />
-      <Tabs.Screen name="video-consultation" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
+      
+      {/* Aba Clientes - Apenas para advogados */}
+      {role === 'lawyer' && (
+        <Tabs.Screen
+          name="clientes/index"
+          options={{
+            title: 'Clientes',
+            tabBarIcon: ({ color, size }) => <Users2 color={color} size={size} />,
+          }}
+        />
+      )}
     </Tabs>
   );
 }
 
-export default function TabLayout() {
-  const { isLoading, role } = useAuth();
+export default function TabsLayout() {
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
