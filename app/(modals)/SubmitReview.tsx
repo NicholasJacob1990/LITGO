@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvo
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Star, X } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import ReviewsService from '../../lib/services/reviews'; // Caminho relativo para maior robustez
+import ReviewsService, { ReviewCreatePayload } from '../../lib/services/reviews';
 
 interface StarRatingProps {
   rating: number;
@@ -37,15 +37,15 @@ export default function SubmitReview() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (newReview: { reviewId: string, response: { message: string, rating: number } }) => 
-      ReviewsService.respondToReview(newReview.reviewId, newReview.response),
+    mutationFn: (newReview: { contractId: string, payload: ReviewCreatePayload }) => 
+      ReviewsService.createReview(newReview.contractId, newReview.payload),
     onSuccess: () => {
       Alert.alert('Sucesso', 'Sua avaliação foi enviada!');
       queryClient.invalidateQueries({ queryKey: ['reviews', contractId] });
       queryClient.invalidateQueries({ queryKey: ['cases', caseId] });
       router.back();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       Alert.alert('Erro', `Não foi possível enviar sua avaliação: ${error.message}`);
     }
   });
@@ -55,11 +55,14 @@ export default function SubmitReview() {
       Alert.alert('Avaliação Incompleta', 'Por favor, selecione uma nota de 1 a 5 estrelas.');
       return;
     }
-    // Assumindo que o contractId é o ID da avaliação a ser respondida.
-    // A lógica pode precisar de ajuste dependendo do fluxo real.
+    if (!contractId) {
+      Alert.alert('Erro', 'ID do contrato não encontrado.');
+      return;
+    }
+
     mutation.mutate({ 
-      reviewId: contractId, 
-      response: { message: comment, rating } 
+      contractId, 
+      payload: { rating, comment } 
     });
   };
 

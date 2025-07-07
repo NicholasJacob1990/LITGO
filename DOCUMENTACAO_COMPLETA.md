@@ -644,11 +644,11 @@ WEIGHTS = {
 
 ### Fluxo do Algoritmo
 
-1. **Cálculo Raw Score**: Soma ponderada das 8 features
-2. **Epsilon Clustering**: Agrupa advogados com score similar (±5%)
-3. **Aplicação de Equidade**: Favorece advogados com menor carga de trabalho
-4. **Boost de Diversidade**: Aplica boost para grupos sub-representados
-5. **Ranking Final**: Ordena por score justo + desempate por timestamp
+1.  **Cálculo Raw Score**: Soma ponderada das 8 features
+2.  **Epsilon Clustering**: Agrupa advogados com score similar (±5%)
+3.  **Aplicação de Equidade**: Favorece advogados com menor carga de trabalho
+4.  **Boost de Diversidade**: Aplica boost para grupos sub-representados
+5.  **Ranking Final**: Ordena por score justo + desempate por timestamp
 
 ### Exemplo de Uso
 
@@ -793,6 +793,111 @@ O processo de finalização é uma transação com várias etapas críticas:
 6.  **Persistência da Análise de CV:** Se o CV foi analisado, os resultados estruturados da IA são salvos em uma tabela associada, vinculada ao `user.id` e à `cvUrl`.
 
 Após a conclusão bem-sucedida, o usuário recebe um alerta de confirmação e é redirecionado para a tela de login.
+
+```mermaid
+flowchart TD
+    subgraph "Frontend: Cadastro de Advogado (Multi-Etapas)"
+        A[Inicia em '/register-lawyer'] --> B["Etapa 1: Infos Pessoais"];
+        B --> C["Etapa 2: Dados Profissionais e Endereço"];
+        C --> D["Etapa 3: Documentos (CV, OAB, etc.)"];
+        D --> E["Etapa 4: Diversidade (Opcional)"];
+        E --> F["Etapa 5: Termos e Contrato"];
+        F --> G{Finalizar Cadastro};
+    end
+
+    subgraph "Backend: Orquestração do Cadastro"
+        H["1. Geocodificar Endereço"];
+        I["2. Criar Usuário no Supabase Auth<br/>(role: lawyer_pending_approval)"];
+        J["3. Upload dos Documentos para Storage"];
+        K["4. Inserir Perfil na Tabela 'lawyers'"];
+        L["5. Salvar Análise do CV (se houver)"];
+    end
+
+    subgraph "Usuário"
+        M["Alerta: 'Cadastro enviado para análise'"];
+        N[Redirecionado para a tela de Login];
+    end
+
+    G -- "Clica" --> H;
+    H -- "Sucesso" --> I;
+    H -- "Falha" --> O[Exibe erro de endereço];
+    
+    I -- "Sucesso" --> J;
+    I -- "Falha" --> P["Exibe erro<br/>(E-mail já existe)"];
+
+    J -- "Sucesso" --> K;
+    J -- "Falha" --> Q["Deleta usuário do Auth (rollback)<br/>Exibe erro de upload"];
+
+    K -- "Sucesso" --> L;
+    L -- "Sucesso" --> M;
+    M --> N;
+end
+```
+
+---
+
+### 2. Cadastro de Cliente (`app/(auth)/register-client.tsx`)
+
+O fluxo de cadastro de cliente é a porta de entrada para usuários que buscam assessoria jurídica. A tela foi projetada para ser flexível, atendendo tanto pessoas físicas (PF) quanto jurídicas (PJ).
+
+**Visão Geral do Componente:**
+- **Localização:** `app/(auth)/register-client.tsx`
+- **Propósito:** Coletar os dados necessários para criar uma conta de cliente, com validação e formatação em tempo real.
+- **Frameworks/Libs:** React Native, Expo Router, Supabase.
+
+**Funcionalidades Principais:**
+
+1.  **Seletor de Tipo de Usuário:**
+    -   O usuário começa escolhendo entre "Pessoa Física" ou "Pessoa Jurídica".
+    -   Essa escolha altera dinamicamente os campos do formulário para solicitar os documentos e nomes corretos.
+
+2.  **Formulário Adaptativo:**
+    -   **Para Pessoa Física (PF):** São solicitados `Nome Completo` e `CPF`.
+    -   **Para Pessoa Jurídica (PJ):** São solicitados `Razão Social` e `CNPJ`.
+    -   **Campos Comuns:** `E-mail`, `Telefone` e `Senha` são requeridos para ambos os tipos.
+
+3.  **Validação e Formatação em Tempo Real:**
+    -   Os campos de `CPF`, `CNPJ` e `Telefone` possuem máscaras que formatam a entrada do usuário automaticamente, melhorando a experiência e garantindo a consistência dos dados.
+    -   Validações robustas verificam o formato do e-mail, a força da senha e o preenchimento correto de todos os campos obrigatórios antes de permitir o envio.
+
+**Lógica de Submissão (`handleRegister`):**
+
+1.  **Criação de Usuário (Supabase Auth):** Após a validação do formulário, a função `supabase.auth.signUp` é chamada.
+2.  **Armazenamento de Metadados:** As informações do cliente, como nome/razão social, CPF/CNPJ, telefone e o tipo de usuário (`PF` ou `PJ`), são salvas diretamente no campo `options.data` do Supabase. A `role` é definida como `client`.
+3.  **Confirmação por E-mail:** O Supabase envia automaticamente um e-mail de confirmação para o endereço fornecido. A conta só se torna ativa após o clique no link de verificação.
+4.  **Redirecionamento:** Após a submissão bem-sucedida, o usuário é notificado sobre o e-mail de confirmação e é redirecionado para a tela de login.
+
+```mermaid
+flowchart TD
+    subgraph "Frontend (app/register-client.tsx)"
+        A[Inicia tela de cadastro] --> B{Escolhe tipo: PF ou PJ?};
+        B -- "Pessoa Física" --> C1[Preenche: Nome, CPF, Email, Tel, Senha];
+        B -- "Pessoa Jurídica" --> C2[Preenche: Razão Social, CNPJ, Email, Tel, Senha];
+        C1 --> D["Clica em 'Criar Conta'"];
+        C2 --> D;
+        D --> E{Formulário Válido?};
+    end
+
+    subgraph "Backend (Supabase)"
+        F[supabase.auth.signUp] --> G[Cria usuário com status pendente];
+        G --> H[Envia e-mail de confirmação];
+    end
+
+    subgraph "Usuário"
+        I["Recebe Alerta de Sucesso<br/>'Verifique seu e-mail'"];
+        J[Redirecionado para Login];
+        K[Abre e-mail e clica no link];
+        L[Conta é ativada];
+    end
+
+    E -- "Sim" --> F;
+    E -- "Não" --> M[Exibe erros de validação na tela];
+    F -- "Sucesso" --> I;
+    F -- "Erro" --> N["Exibe erro<br/>'E-mail já existe', etc."];
+    I --> J;
+    H --> K --> L;
+end
+```
 
 ---
 

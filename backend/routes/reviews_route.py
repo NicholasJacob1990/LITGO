@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-backend/routes/reviews.py
+backend/routes/reviews_route.py
 
 Rotas da API para criar e gerenciar avaliações (reviews).
 """
@@ -45,8 +45,6 @@ async def create_review_for_contract(
     client_id = uuid.UUID(client_id_str)
     review_service = ReviewService(supabase)
 
-    # Precisamos do lawyer_id para registrar a avaliação.
-    # Buscamos do contrato e validamos a permissão.
     try:
         contract_res = supabase.table("contracts").select("lawyer_id, client_id").eq("id", str(contract_id)).single().execute()
         
@@ -61,8 +59,6 @@ async def create_review_for_contract(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching contract: {e}")
 
-    # A lógica de criação de review agora está no ReviewService.
-    # O serviço em si é simples, pois a maior parte da validação é feita pela RLS do Supabase.
     created_review = await review_service.create_review(
         contract_id=contract_id,
         review_data=review_data,

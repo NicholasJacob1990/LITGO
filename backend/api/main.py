@@ -42,7 +42,7 @@ from backend.algoritmo_match import (
     MatchmakingAlgorithm,
 )
 from backend.routes import (
-    cases, recommendations, users, payments, offers, reviews, timeline, contracts, financials,
+    cases, recommendations, users, payments, offers, reviews_route, timeline, contracts, financials,
     availability
 )
 from backend.api.schemas import (
@@ -95,7 +95,7 @@ app.include_router(cases.router, prefix="/api")
 app.include_router(recommendations.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(offers.router, prefix="/api")
-app.include_router(reviews.router, prefix="/api")
+app.include_router(reviews_route.router, prefix="/api")
 app.include_router(timeline.router, prefix="/api")
 app.include_router(contracts.router, prefix="/api")
 app.include_router(financials.router, prefix="/api")

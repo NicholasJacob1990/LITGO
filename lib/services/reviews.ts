@@ -1,7 +1,39 @@
 import { API_URL, getAuthHeaders } from './api';
 import type { Review, LawyerResponseCreate, LawyerResponseUpdate } from './api';
 
+export interface ReviewCreatePayload {
+    rating: number;
+    comment?: string;
+    outcome?: 'won' | 'lost' | 'settled' | 'ongoing';
+    communication_rating?: number;
+    expertise_rating?: number;
+    timeliness_rating?: number;
+    would_recommend?: boolean;
+}
+
 export class ReviewsService {
+  /**
+   * Criar uma nova avaliação para um contrato
+   */
+  static async createReview(contractId: string, reviewData: ReviewCreatePayload): Promise<Review> {
+    const headers = await getAuthHeaders();
+    const result = await fetch(`${API_URL}/reviews/contracts/${contractId}`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reviewData),
+    });
+
+    if (!result.ok) {
+      const errorData = await result.json().catch(() => ({ detail: result.statusText }));
+      throw new Error(`Erro ao criar avaliação: ${errorData.detail || result.statusText}`);
+    }
+    
+    return result.json();
+  }
+
   /**
    * Responder a uma avaliação (advogado)
    */

@@ -9,9 +9,10 @@ Baseado nas melhores práticas de FastAPI para Machine Learning.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, validator
+import uuid
 
 
 class AreaJuridica(str, Enum):
@@ -316,3 +317,27 @@ class CaseCreate(BaseModel):
 class CaseSchema(BaseModel):
     id: str
     client_id: str
+
+
+class CaseOutcome(str, Enum):
+    won = "won"
+    lost = "lost"
+    settled = "settled"
+    ongoing = "ongoing"
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    outcome: Optional[CaseOutcome] = None
+    communication_rating: Optional[int] = Field(None, ge=1, le=5)
+    expertise_rating: Optional[int] = Field(None, ge=1, le=5)
+    timeliness_rating: Optional[int] = Field(None, ge=1, le=5)
+    would_recommend: Optional[bool] = None
+
+class ReviewResponse(ReviewCreate):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
