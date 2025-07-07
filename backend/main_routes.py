@@ -126,8 +126,7 @@ async def http_find_matches(req: MatchRequest, user: dict = Depends(get_current_
     result = await find_and_notify_matches(req)
     if result is None:
         raise HTTPException(
-            status_code=404, detail=f"Caso com ID '{
-                req.case_id}' não encontrado.")
+            status_code=404, detail=f"Caso com ID '{req.case_id}' não encontrado.")
 
     return result
 
