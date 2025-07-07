@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Briefcase, ChevronRight } from 'lucide-react-native';
-import { getCasesWithMatches, CaseWithMatches } from '@/lib/services/api';
+import { Briefcase, ChevronRight, LucideIcon } from 'lucide-react-native';
+import { getCasesWithMatches } from '@/lib/services/api';
+import { Case } from '@/lib/types/cases';
 import EmptyState from '@/components/atoms/EmptyState';
+
+// Combinando o tipo Case com a contagem de matches
+export type CaseWithMatches = Case & { match_count: number };
 
 const RecommendationsScreen = () => {
   const router = useRouter();
@@ -15,7 +19,7 @@ const RecommendationsScreen = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const fetchedCases = await getCasesWithMatches();
+      const fetchedCases: CaseWithMatches[] = await getCasesWithMatches();
       setCases(fetchedCases);
     } catch (e) {
       setError('Falha ao buscar suas recomendações. Tente novamente.');
@@ -66,11 +70,13 @@ const RecommendationsScreen = () => {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchCases} />}
         ListEmptyComponent={
-          <EmptyState
-            icon={Briefcase}
-            title="Nenhuma Recomendação"
-            description="Quando você criar um caso e receber recomendações de advogados, elas aparecerão aqui."
-          />
+          !isLoading ? (
+            <EmptyState
+              icon={Briefcase as unknown as React.ComponentType<{ size: number; color: string; }>}
+              title="Nenhuma Recomendação"
+              description="Quando você criar um caso e receber recomendações de advogados, elas aparecerão aqui."
+            />
+          ) : null
         }
       />
     </SafeAreaView>

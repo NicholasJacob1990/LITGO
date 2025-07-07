@@ -13,5 +13,12 @@ export type CasesStackParamList = {
 }; 
 
 export type Case = {
-  // ... existing code ...
+  id: string;
+  title: string;
+  description: string;
+  status: 'open' | 'closed' | 'in_progress' | 'pending';
+  created_at: string;
+  client_id: string;
+  lawyer_id?: string;
+  area: string;
 }; 
