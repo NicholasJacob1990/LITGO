@@ -1,398 +1,296 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  KeyboardAvoidingView, 
+  Platform, 
+  SafeAreaView,
   Alert
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Send, Bot, User } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { generateTriageAnalysis, ChatGPTMessage } from '@/lib/openai';
+import { Paperclip, Send, Bot } from 'lucide-react-native';
+import { continueTriageConversation, startTriage } from '@/lib/services/api';
+import { runHybridTriageAnalysis, checkTriageStatus } from '@/lib/openai';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import AITypingIndicator from '@/components/AITypingIndicator';
 
-interface ChatMessage {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: Date;
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
-export default function ChatTriagemScreen() {
+const ChatTriageScreen = () => {
   const router = useRouter();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [triageEnded, setTriageEnded] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  // Mensagem inicial do assistente
+  const startConversation = useCallback(async () => {
+    if (messages.length > 0) return;
+    setIsLoading(true);
+    try {
+      const response = await continueTriageConversation([]);
+      setMessages([{ role: 'assistant', content: response.reply }]);
+    } catch (error) {
+      console.error("Erro ao iniciar a conversa:", error);
+      setMessages([{ role: 'assistant', content: "Olá! Sou o Justus, seu assistente jurídico. Para começarmos, por favor, descreva seu problema." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages.length]);
+
   useEffect(() => {
-    const initialMessage: ChatMessage = {
-      id: '1',
-      text: 'Olá! Sou o LEX-9000, seu assistente jurídico inteligente. Vou ajudá-lo a analisar sua situação jurídica através de algumas perguntas. Para começar, você pode me descrever qual é o problema jurídico que está enfrentando?',
-      isUser: false,
-      timestamp: new Date()
-    };
-    setMessages([initialMessage]);
-  }, []);
+    startConversation();
+  }, [startConversation]);
 
-  const addMessage = (text: string, isUser: boolean) => {
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text,
-      isUser,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, newMessage]);
-  };
+  const handleSend = async () => {
+    if (input.trim() === '' || isLoading) return;
 
-  const convertToChatGPTFormat = (messages: ChatMessage[]): ChatGPTMessage[] => {
-    return messages
-      .filter(msg => msg.id !== '1') // Remove mensagem inicial
-      .map(msg => ({
-        role: msg.isUser ? 'user' as const : 'assistant' as const,
-        content: msg.text
-      }));
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || isLoading) return;
-
-    const userMessage = inputText.trim();
-    setInputText('');
-    addMessage(userMessage, true);
+    const userMessage: Message = { role: 'user', content: input };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInput('');
     setIsLoading(true);
 
     try {
-      // Converte mensagens para formato da API
-      const chatHistory = convertToChatGPTFormat([...messages, {
-        id: Date.now().toString(),
-        text: userMessage,
-        isUser: true,
-        timestamp: new Date()
-      }]);
-
-      const response = await generateTriageAnalysis(chatHistory);
-
-      if (response.isComplete) {
-        // Análise completa
-        setAnalysisResult(response.analysis);
-        setIsComplete(true);
-        addMessage(
-          'Perfeito! Concluí a análise do seu caso. Com base nas informações coletadas, gerei uma síntese jurídica completa. Vou te mostrar os resultados...',
-          false
-        );
-        
-        // Aguarda um pouco e redireciona para síntese
-        setTimeout(() => {
-          Alert.alert(
-            'Análise Concluída',
-            'Sua triagem jurídica foi finalizada! Você será direcionado para visualizar a síntese completa.',
-            [{ text: 'Ver Síntese', onPress: () => router.push('/sintese') }]
-          );
-        }, 2000);
+      const response = await continueTriageConversation(newMessages);
+      
+      if (response.reply.includes('[END_OF_TRIAGE]')) {
+        setTriageEnded(true);
+        const finalMessage = response.reply.replace('[END_OF_TRIAGE]', '').trim();
+        if (finalMessage) {
+            setMessages(prev => [...prev, { role: 'assistant', content: finalMessage }]);
+        }
       } else {
-        // Próxima pergunta
-        addMessage(response.nextQuestion, false);
+        setMessages(prev => [...prev, { role: 'assistant', content: response.reply }]);
       }
     } catch (error) {
-      console.error('Erro na API:', error);
-      addMessage(
-        'Desculpe, tive um problema técnico. Pode repetir sua última resposta?',
-        false
-      );
+      console.error("Erro ao enviar mensagem:", error);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Desculpe, estou com problemas para conectar. Por favor, tente novamente." }]);
     } finally {
       setIsLoading(false);
-      // Scroll para o final
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     }
   };
 
-  const renderMessage = (message: ChatMessage) => (
-    <View
-      key={message.id}
-      style={[
-        styles.messageContainer,
-        message.isUser ? styles.userMessage : styles.botMessage
-      ]}
-    >
-      <View style={styles.messageHeader}>
-        <View style={[styles.avatar, message.isUser ? styles.userAvatar : styles.botAvatar]}>
-          {message.isUser ? (
-            <User size={16} color="#FFFFFF" />
-          ) : (
-            <Bot size={16} color="#FFFFFF" />
-          )}
+  const handleFinishTriage = async () => {
+      setIsLoading(true);
+      const transcript = messages.map(m => `${m.role === 'user' ? 'Cliente' : 'Assistente'}: ${m.content}`).join('\n\n');
+      
+      try {
+        if (!user) {
+            Alert.alert("Erro", "Você precisa estar logado para iniciar uma triagem.");
+            setIsLoading(false);
+            return;
+        }
+
+        // Usar o novo Pipeline de Triagem Híbrida
+        const result = await runHybridTriageAnalysis(transcript, user.id);
+        
+        if (result.success) {
+          Alert.alert(
+            "Análise Iniciada", 
+            `Sua análise foi iniciada com sucesso usando estratégia ${result.strategy}. Você será notificado quando os resultados estiverem prontos e eles aparecerão na aba 'Recomendações'.`
+          );
+
+          // Navega para a nova aba de recomendações
+          router.push('/(tabs)/recommendations');
+        } else {
+          // Fallback para método antigo se o híbrido falhar
+          console.warn("Pipeline híbrido falhou, usando método tradicional:", result.error);
+          const task = await startTriage({ texto_cliente: transcript });
+          
+          Alert.alert("Análise Iniciada", "Sua análise foi iniciada com sucesso. Você será notificado quando os resultados estiverem prontos e eles aparecerão na aba 'Recomendações'.");
+          router.push('/(tabs)/recommendations');
+        }
+
+      } catch (error) {
+          console.error("Erro ao finalizar triagem:", error);
+          Alert.alert("Erro", "Não foi possível iniciar a análise do seu caso. Tente novamente mais tarde.");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+  
+  const renderMessage = (message: Message, index: number) => (
+    <View key={index} style={[styles.messageContainer, message.role === 'user' ? styles.userMessageContainer : styles.botMessageContainer]}>
+        <View style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.botBubble]}>
+            <Text style={message.role === 'user' ? styles.userText : styles.botText}>{message.content}</Text>
         </View>
-        <Text style={styles.messageAuthor}>
-          {message.isUser ? 'Você' : 'LEX-9000'}
-        </Text>
-        <Text style={styles.messageTime}>
-          {message.timestamp.toLocaleTimeString('pt-BR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })}
-        </Text>
-      </View>
-      <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.botBubble]}>
-        <Text style={[styles.messageText, message.isUser ? styles.userText : styles.botText]}>
-          {message.text}
-        </Text>
-      </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* Header */}
-      <LinearGradient
-        colors={['#1E40AF', '#3B82F6']}
-        style={styles.header}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
       >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>Triagem Inteligente</Text>
-            <Text style={styles.headerSubtitle}>
-              {isComplete ? 'Análise Concluída' : 'Conversando com IA'}
-            </Text>
-          </View>
-          
-          <View style={styles.statusIndicator}>
-            <Bot size={20} color="#FFFFFF" />
-          </View>
-        </View>
-      </LinearGradient>
+        <LinearGradient colors={['#FFFFFF', '#F9FAFB']} style={styles.header}>
+            <Text style={styles.headerTitle}>Triagem Conversacional</Text>
+            <Text style={styles.headerSubtitle}>Converse com nosso assistente para explicar seu caso</Text>
+        </LinearGradient>
 
-      {/* Chat Messages */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.chatContainer}
-        contentContainerStyle={styles.chatContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map(renderMessage)}
-        
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <View style={styles.loadingBubble}>
-              <AITypingIndicator />
-            </View>
-          </View>
-        )}
-      </ScrollView>
+        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.messagesContainer}>
+          {messages.map(renderMessage)}
+          {isLoading && <AITypingIndicator />}
+        </ScrollView>
 
-      {/* Input Area */}
-      {!isComplete && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.inputContainer}
-        >
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Digite sua resposta..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              maxLength={500}
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, (!inputText.trim() || isLoading) && styles.sendButtonDisabled]}
-              onPress={handleSendMessage}
-              disabled={!inputText.trim() || isLoading}
-            >
-              <Send size={20} color="#FFFFFF" />
+        {triageEnded ? (
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.finishButton} onPress={handleFinishTriage} disabled={isLoading}>
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.finishButtonText}>Ver Advogados Recomendados</Text>}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      )}
-    </View>
+        ) : (
+          <View style={styles.inputContainer}>
+            <TouchableOpacity style={styles.attachButton}>
+              <Paperclip size={22} color="#6B7280" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Digite sua mensagem..."
+              editable={!isLoading}
+              multiline
+            />
+            <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={isLoading || !input.trim()}>
+              <Send size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-  },
-  statusIndicator: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chatContainer: {
-    flex: 1,
-  },
-  chatContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  messageContainer: {
-    marginBottom: 20,
-  },
-  messageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  userAvatar: {
-    backgroundColor: '#10B981',
-  },
-  botAvatar: {
-    backgroundColor: '#1E40AF',
-  },
-  messageAuthor: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
-    marginRight: 8,
-  },
-  messageTime: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  messageBubble: {
-    padding: 16,
-    borderRadius: 16,
-    maxWidth: '85%',
-  },
-  userMessage: {
-    alignItems: 'flex-end',
-  },
-  botMessage: {
-    alignItems: 'flex-start',
-  },
-  userBubble: {
-    backgroundColor: '#10B981',
-    borderBottomRightRadius: 4,
-  },
-  botBubble: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  userText: {
-    color: '#FFFFFF',
-  },
-  botText: {
-    color: '#374151',
-  },
-  loadingContainer: {
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  loadingBubble: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    maxWidth: '85%',
-  },
-  inputContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    maxHeight: 100,
-    minHeight: 40,
-    paddingVertical: 8,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1E40AF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-}); 
+    container: {
+        flex: 1,
+        backgroundColor: '#F9FAFB',
+    },
+    header: {
+        padding: 16,
+        paddingTop: Platform.OS === 'android' ? 40 : 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#1F2937',
+        textAlign: 'center',
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    messagesContainer: {
+        padding: 16,
+    },
+    messageContainer: {
+        marginVertical: 8,
+        maxWidth: '80%',
+    },
+    userMessageContainer: {
+        alignSelf: 'flex-end',
+    },
+    botMessageContainer: {
+        alignSelf: 'flex-start',
+    },
+    messageBubble: {
+        padding: 12,
+        borderRadius: 18,
+    },
+    userBubble: {
+        backgroundColor: '#007AFF',
+        borderBottomRightRadius: 4,
+    },
+    botBubble: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderBottomLeftRadius: 4,
+    },
+    userText: {
+        color: 'white',
+        fontSize: 16,
+    },
+    botText: {
+        color: '#1F2937',
+        fontSize: 16,
+    },
+    typingIndicator: {
+        alignSelf: 'flex-start',
+        marginLeft: 10,
+        marginTop: 10,
+    },
+    footer: {
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF'
+    },
+    finishButton: {
+        backgroundColor: '#16A34A',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    finishButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF',
+    },
+    attachButton: {
+        padding: 8,
+    },
+    input: {
+        flex: 1,
+        minHeight: 44,
+        maxHeight: 120,
+        paddingHorizontal: 16,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 22,
+        fontSize: 16,
+        lineHeight: 20,
+    },
+    sendButton: {
+        marginLeft: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#007AFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});
+
+export default ChatTriageScreen; 

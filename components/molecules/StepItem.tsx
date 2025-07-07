@@ -1,87 +1,51 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react-native';
-import StatusDot from '../atoms/StatusDot';
-import ProgressBar from '../atoms/ProgressBar';
+import Badge from '../atoms/Badge';
 
-interface StepItemProps {
+type StepItemProps = {
   title: string;
-  description?: string;
-  status: 'completed' | 'active' | 'pending' | 'warning';
-  priority?: number; // 1-10
+  description: string;
+  status: 'completed' | 'pending' | 'delayed';
+  priority: 'high' | 'medium' | 'low';
   dueDate?: string;
   isLast?: boolean;
-}
+};
 
-export default function StepItem({ 
-  title, 
-  description, 
-  status, 
-  priority, 
-  dueDate,
-  isLast = false 
-}: StepItemProps) {
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle size={20} color="#1DB57C" />;
-      case 'active':
-        return <Clock size={20} color="#006CFF" />;
-      case 'warning':
-        return <AlertCircle size={20} color="#F5A623" />;
-      default:
-        return <Clock size={20} color="#6B7280" />;
-    }
-  };
+const statusConfig = {
+  completed: { icon: CheckCircle, color: '#10B981' },
+  pending: { icon: Clock, color: '#6B7280' },
+  delayed: { icon: AlertCircle, color: '#EF4444' },
+};
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit'
-    });
-  };
+const priorityConfig = {
+  high: { label: 'Alta', intent: 'danger' },
+  medium: { label: 'Média', intent: 'warning' },
+  low: { label: 'Baixa', intent: 'info' },
+};
+
+export default function StepItem({ title, description, status, priority, dueDate, isLast = false }: StepItemProps) {
+  const { icon: Icon, color } = statusConfig[status];
+  const { label: priorityLabel, intent: priorityIntent } = priorityConfig[priority];
 
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        {getStatusIcon()}
-        {!isLast && <View style={styles.connector} />}
+        <View style={[styles.iconWrapper, { backgroundColor: color }]}>
+          <Icon size={16} color="#FFFFFF" />
+        </View>
+        {!isLast && <View style={styles.line} />}
       </View>
-      
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={[
-            styles.title,
-            status === 'completed' && styles.titleCompleted
-          ]}>
-            {title}
-          </Text>
-          
-          <View style={styles.meta}>
-            <StatusDot status={status} size="small" />
-            {dueDate && (
-              <Text style={styles.dueDate}>
-                {formatDate(dueDate)}
-              </Text>
-            )}
-          </View>
+          <Text style={styles.title}>{title}</Text>
+          <Badge label={priorityLabel} intent={priorityIntent as any} size="small" />
         </View>
-        
-        {description && (
-          <Text style={[
-            styles.description,
-            status === 'completed' && styles.descriptionCompleted
-          ]}>
-            {description}
+        <Text style={styles.description}>{description}</Text>
+        {dueDate && (
+          <Text style={styles.dueDate}>
+            Prazo: {new Date(dueDate).toLocaleDateString('pt-BR')}
           </Text>
-        )}
-        
-        {priority && priority > 0 && (
-          <View style={styles.priorityContainer}>
-            <Text style={styles.priorityLabel}>Prioridade:</Text>
-            <ProgressBar value={priority} maxValue={10} height={6} />
-            <Text style={styles.priorityValue}>{priority}/10</Text>
-          </View>
         )}
       </View>
     </View>
@@ -91,28 +55,36 @@ export default function StepItem({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    gap: 16,
   },
   iconContainer: {
     alignItems: 'center',
-    marginRight: 12,
-    position: 'relative',
   },
-  connector: {
-    position: 'absolute',
-    top: 24,
-    width: 2,
+  iconWrapper: {
+    width: 32,
     height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  line: {
+    width: 2,
+    height: '100%',
     backgroundColor: '#E5E7EB',
+    position: 'absolute',
+    top: 32,
+    left: 15,
   },
   content: {
     flex: 1,
-    paddingBottom: 8,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 4,
   },
   title: {
@@ -122,20 +94,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  titleCompleted: {
-    color: '#6B7280',
-    textDecorationLine: 'line-through',
-  },
-  meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dueDate: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: '#6B7280',
-  },
   description: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
@@ -143,24 +101,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  descriptionCompleted: {
-    color: '#9CA3AF',
-  },
-  priorityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  priorityLabel: {
+  dueDate: {
     fontFamily: 'Inter-Medium',
     fontSize: 12,
-    color: '#374151',
-  },
-  priorityValue: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 12,
-    color: '#374151',
-    minWidth: 32,
+    color: '#4B5563',
   },
 }); 

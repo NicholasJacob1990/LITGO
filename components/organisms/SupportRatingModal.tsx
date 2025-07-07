@@ -99,7 +99,7 @@ export default function SupportRatingModal({
             Como foi sua experiência com o ticket:
           </Text>
           <Text style={styles.ticketSubject} numberOfLines={2}>
-            "{ticketSubject}"
+            &quot;{ticketSubject}&quot;
           </Text>
 
           <View style={styles.ratingSection}>

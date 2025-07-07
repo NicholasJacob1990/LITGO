@@ -45,6 +45,9 @@ using ( auth.uid() = user_id );
 
 
 -- 5. Create the RPC function to get cases for a user
+-- Drop existing function first to avoid conflicts
+drop function if exists get_user_cases(uuid);
+
 create or replace function get_user_cases(p_user_id uuid)
 returns table (
     id uuid,

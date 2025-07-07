@@ -6,7 +6,7 @@ Este arquivo configura fixtures e mocks necessários para os testes.
 import pytest
 import os
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 # Configurar ambiente de teste
 os.environ["TESTING"] = "true"
@@ -14,22 +14,50 @@ os.environ["SUPABASE_URL"] = "https://test.supabase.co"
 os.environ["SUPABASE_SERVICE_KEY"] = "test-service-key"
 os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-key"
-os.environ["REDIS_URL"] = "redis://localhost:6379/1"  # DB diferente para testes
+
+# Usar Redis do contêiner se já estiver configurado, senão usar localhost
+# Isso permite que os testes funcionem tanto localmente quanto no Docker
+if "REDIS_URL" not in os.environ:
+    os.environ["REDIS_URL"] = "redis://localhost:6379/1"  # DB diferente para testes locais
 
 
-@pytest.fixture
-def client():
-    """Cliente de teste FastAPI."""
-    # Patch da autenticação para testes
-    with patch('backend.auth.get_current_user') as mock_auth:
-        mock_auth.return_value = {
-            "id": "test-user-id",
-            "email": "test@example.com",
-            "role": "authenticated"
-        }
-        
-        from backend.main import app
-        return TestClient(app)
+@pytest.fixture(scope="session")
+def app_with_mocks():
+    """
+    Cria uma instância do app FastAPI com as dependências
+    de serviços mockadas para testes.
+    """
+    mock_redis_service = MagicMock()
+    mock_redis_service.initialize = AsyncMock()
+    mock_redis_service.close = AsyncMock()
+    mock_redis_service.health_check = AsyncMock(return_value={"status": "healthy"})
+
+    mock_cache_service_init = AsyncMock()
+    mock_cache_service_close = AsyncMock()
+
+    # Importa o app e as dependências que vamos substituir
+    from backend.main import app, redis_service, init_simple_cache, close_simple_cache
+    from backend.auth import get_current_user
+
+    # Aplica os overrides
+    app.dependency_overrides[redis_service] = lambda: mock_redis_service
+    app.dependency_overrides[init_simple_cache] = mock_cache_service_init
+    app.dependency_overrides[close_simple_cache] = lambda: mock_cache_service_close
+    app.dependency_overrides[get_current_user] = lambda: {"id": "test-user-id"}
+
+    yield app
+
+    # Limpa os overrides depois que os testes terminarem
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="session")
+def client(app_with_mocks):
+    """
+    Cria um TestClient para interagir com o app mockado.
+    """
+    with TestClient(app_with_mocks) as test_client:
+        yield test_client
 
 
 @pytest.fixture

@@ -1,12 +1,10 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Briefcase, MessageCircle, User, Users, Calendar, LifeBuoy, CheckSquare, ListTodo, Settings } from 'lucide-react-native';
+import { Home, Briefcase, User, Users, CreditCard, Gift } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 
-const PRIMARY_COLOR = '#0F172A';
-const SECONDARY_COLOR = '#1E293B';
+const PRIMARY_COLOR = '#0D47A1';
 const GREY_COLOR = '#64748B';
 
 function AppTabs() {
@@ -15,104 +13,83 @@ function AppTabs() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: PRIMARY_COLOR,
         tabBarInactiveTintColor: GREY_COLOR,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: '#ffffff',
           borderTopWidth: 1,
-          borderTopColor: '#E2E8F0',
+          borderTopColor: '#e0e0e0',
           height: 60,
-          paddingBottom: 10,
+          paddingBottom: 5,
           paddingTop: 5,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontFamily: 'Inter-Medium',
+          fontSize: 10,
         },
-        headerShown: false,
-      }}>
-      
-      {/* Aba Início - Para todos os usuários */}
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-
-      {/* Aba Advogados - Apenas para clientes */}
-      {role === 'client' && (
-        <Tabs.Screen
-          name="advogados"
-          options={{
-            title: 'Advogados',
-            tabBarIcon: ({ color }) => <FontAwesome size={28} name="users" color={color} />,
-          }}
-        />
-      )}
-
-      {/* Aba Casos - Para todos os usuários */}
       <Tabs.Screen
         name="cases"
         options={{
-          title: 'Casos',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="briefcase" color={color} />,
+          title: 'Meus Casos',
+          tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
         }}
       />
-
-      {/* Aba Contratos - Apenas para Advogados */}
-      {role === 'lawyer' && (
-        <Tabs.Screen
-          name="contracts"
-          options={{
-            title: 'Contratos',
-            tabBarIcon: ({ color }) => <FontAwesome size={28} name="file-text" color={color} />,
-          }}
-        />
-      )}
-
-      {/* Aba Agenda - Para todos os usuários */}
       <Tabs.Screen
-        name="agenda"
+        name="advogados"
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="calendar" color={color} />,
+          title: 'Advogados',
+          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
+          href: role === 'lawyer' ? null : '/(tabs)/advogados',
         }}
       />
-
-      {/* Aba Chat - Para todos os usuários */}
       <Tabs.Screen
-        name="chat"
+        name="financeiro"
         options={{
-          title: 'Chat',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="comments" color={color} />,
+          title: 'Financeiro',
+          tabBarIcon: ({ color, size }) => <CreditCard color={color} size={size} />,
+          href: role === 'client' ? '/(tabs)/financeiro' : null,
         }}
       />
-
-      {/* Aba Perfil - Para todos os usuários */}
+      <Tabs.Screen
+        name="ofertas"
+        options={{
+          title: 'Ofertas',
+          tabBarIcon: ({ color, size }) => <Gift color={color} size={size} />,
+          href: role === 'lawyer' ? '/(tabs)/ofertas' : null,
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="user" color={color} />,
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
 
-      {/* Telas ocultas - não aparecem na navegação */}
+      {/* Telas que não devem aparecer na barra de abas */}
+      <Tabs.Screen name="recommendations" options={{ href: null }} />
+      <Tabs.Screen name="contracts" options={{ href: null }} />
+      <Tabs.Screen name="agenda-real" options={{ href: null }} />
+      <Tabs.Screen name="agenda" options={{ href: null }} />
       <Tabs.Screen name="lawyer-details" options={{ href: null }} />
       <Tabs.Screen name="video-consultation" options={{ href: null }} />
-      <Tabs.Screen name="cases/CaseDetail" options={{ href: null }} />
-      <Tabs.Screen name="cases/CaseDocuments" options={{ href: null }} />
-      <Tabs.Screen name="cases/MyCasesList" options={{ href: null }} />
-      <Tabs.Screen name="cases/ClientCasesScreen" options={{ href: null }} />
-      <Tabs.Screen name="cases/LawyerCasesScreen" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }
 
 export default function TabLayout() {
-  const { isLoading } = useAuth();
+  const { isLoading, role } = useAuth();
 
   if (isLoading) {
     return (

@@ -1,214 +1,184 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
-import { useState } from 'react';
-import { Send, Paperclip, Video, Phone, MoveVertical as MoreVertical, CheckCheck } from 'lucide-react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator
+} from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { Send, Paperclip, Phone, Video } from 'lucide-react-native';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import {
+  getCaseMessages,
+  sendMessage,
+  markMessagesAsRead,
+  subscribeToCaseMessages,
+  MessageData
+} from '@/lib/services/chat';
+import { getCaseById } from '@/lib/services/cases';
+import TopBar from '@/components/layout/TopBar';
+import Avatar from '@/components/atoms/Avatar';
 
-export default function ChatScreen() {
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: 'Olá! Sou o Dr. Carlos Mendes, advogado especialista em Direito Trabalhista. Vou ajudá-lo com sua questão sobre rescisão contratual.',
-      sender: 'lawyer',
-      timestamp: '09:30',
-      read: true,
-    },
-    {
-      id: '2',
-      text: 'Obrigado, doutor. Tenho algumas dúvidas sobre as verbas rescisórias que deverei receber.',
-      sender: 'user',
-      timestamp: '09:32',
-      read: true,
-    },
-    {
-      id: '3',
-      text: 'Perfeito! Vou explicar detalhadamente. Com base nas informações que você forneceu na triagem, você tem direito a:\n\n• Saldo de salário\n• Aviso prévio indenizado\n• 13º salário proporcional\n• Férias proporcionais + 1/3\n• FGTS + 40% de multa',
-      sender: 'lawyer',
-      timestamp: '09:35',
-      read: true,
-    },
-    {
-      id: '4',
-      text: 'Isso é muito esclarecedor! Quanto tempo a empresa tem para fazer o pagamento?',
-      sender: 'user',
-      timestamp: '09:37',
-      read: true,
-    },
-    {
-      id: '5',
-      text: 'Excelente pergunta! A empresa tem até 10 dias corridos a partir da demissão para efetuar o pagamento de todas as verbas rescisórias. Caso não cumpra esse prazo, deverá pagar multa equivalente ao seu salário.',
-      sender: 'lawyer',
-      timestamp: '09:40',
-      read: false,
-    },
-  ]);
+export default function CaseChat() {
+  const { user } = useAuth();
+  const { caseId } = useLocalSearchParams<{ caseId: string }>();
 
-  const lawyer = {
-    name: 'Dr. Carlos Mendes',
-    specialty: 'Direito Trabalhista',
-    avatar: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=400',
-    online: true,
-  };
+  const [messages, setMessages] = useState<MessageData[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [caseData, setCaseData] = useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const router = useRouter();
+  const handleNewMessage = useCallback((newMessage: MessageData) => {
+    setMessages(prevMessages => {
+      // Evitar duplicatas
+      if (prevMessages.some(msg => msg.id === newMessage.id)) {
+        return prevMessages;
+      }
+      return [newMessage, ...prevMessages];
+    });
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
+    if (newMessage.sender_id !== user?.id) {
+      markMessagesAsRead(caseId, user?.id || '');
+    }
+  }, [caseId, user?.id]);
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: message,
-      sender: 'user',
-      timestamp: new Date().toLocaleTimeString('pt-BR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }),
-      read: false,
+  useEffect(() => {
+    if (!caseId) return;
+
+    loadCaseData();
+    loadMessages();
+    
+    const subscription = subscribeToCaseMessages(caseId, handleNewMessage);
+
+    return () => {
+      subscription.unsubscribe();
     };
+  }, [caseId, handleNewMessage]);
 
-    setMessages([...messages, newMessage]);
-    setMessage('');
-
-    // Simulate lawyer typing and response
-    setTimeout(() => {
-      const lawyerResponse = {
-        id: (Date.now() + 1).toString(),
-        text: 'Entendi sua dúvida. Vou verificar essa informação e te responder em alguns minutos com todos os detalhes.',
-        sender: 'lawyer',
-        timestamp: new Date().toLocaleTimeString('pt-BR', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        read: false,
-      };
-      setMessages(prev => [...prev, lawyerResponse]);
-    }, 2000);
+  const loadCaseData = async () => {
+    try {
+      const data = await getCaseById(caseId);
+      setCaseData(data);
+    } catch (error) {
+      console.error('Error loading case data:', error);
+    }
   };
+
+  const loadMessages = async () => {
+    if (!caseId) return;
+    try {
+      setLoading(true);
+      const messagesData = await getCaseMessages(caseId);
+      setMessages(messagesData.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+      await markMessagesAsRead(caseId, user?.id || '');
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      Alert.alert('Erro', 'Não foi possível carregar as mensagens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sending || !caseId) return;
+
+    try {
+      setSending(true);
+      await sendMessage({
+        case_id: caseId,
+        sender_id: user?.id || '',
+        content: newMessage.trim(),
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Erro', 'Não foi possível enviar a mensagem');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const renderMessage = (message: MessageData, index: number) => {
+    const isMyMessage = message.sender_id === user?.id;
+    const showAvatar = !isMyMessage && (
+      index === 0 || 
+      messages[index - 1]?.sender_id !== message.sender_id
+    );
+
+    const senderName = isMyMessage 
+      ? 'Você' 
+      : message.sender?.full_name || 'Usuário Desconhecido';
+    const senderAvatar = message.sender?.avatar_url;
+
+    return (
+      <View key={message.id} style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
+        {showAvatar && (
+          <Avatar src={senderAvatar} name={senderName} size="small"/>
+        )}
+        <View style={[styles.messageBubble, isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble, !showAvatar && !isMyMessage && { marginLeft: 40 }]}>
+          {!isMyMessage && showAvatar && <Text style={styles.senderName}>{senderName}</Text>}
+          <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText]}>
+            {message.content}
+          </Text>
+          <Text style={[styles.messageTime, isMyMessage ? styles.myMessageTime : styles.otherMessageTime]}>
+            {new Date(message.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" />
+        <TopBar title="Chat" showBack />
+        <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#006CFF" /></View>
+      </View>
+    );
+  }
+
+  const otherUser = user?.id === caseData?.client_id ? caseData?.lawyer : caseData?.client;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
       <StatusBar style="light" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: lawyer.avatar }} style={styles.avatar} />
-            {lawyer.online && <View style={styles.onlineIndicator} />}
-          </View>
-          <View style={styles.headerInfo}>
-            <Text style={styles.lawyerName}>{lawyer.name}</Text>
-            <Text style={styles.lawyerSpecialty}>{lawyer.specialty}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Phone size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => {
-              // Navegar para videochamada
-              router.push({
-                pathname: '/(tabs)/video-consultation',
-                params: { 
-                  lawyerId: 'demo-lawyer-id', // Em produção, usar ID real do advogado
-                  caseId: 'demo-case-id' // Em produção, usar ID real do caso
-                }
-              });
-            }}
-          >
-            <Video size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <MoreVertical size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TopBar 
+        title={otherUser?.name || 'Chat'}
+        subtitle={caseData?.title || ''}
+        showBack
+        rightActions={[
+          { icon: Video, onPress: () => Alert.alert('Vídeo Chamada', 'Funcionalidade em desenvolvimento') },
+          { icon: Phone, onPress: () => Alert.alert('Ligação', 'Funcionalidade em desenvolvimento') },
+        ]}
+      />
 
-      {/* Messages */}
-      <ScrollView 
+      <ScrollView
+        ref={scrollViewRef}
         style={styles.messagesContainer}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.messagesContent}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingVertical: 16 }}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
-        {messages.map((msg) => (
-          <View
-            key={msg.id}
-            style={[
-              styles.messageContainer,
-              msg.sender === 'user' ? styles.userMessageContainer : styles.lawyerMessageContainer
-            ]}
-          >
-            {msg.sender === 'lawyer' && (
-              <Image source={{ uri: lawyer.avatar }} style={styles.messageAvatar} />
-            )}
-            
-            <View
-              style={[
-                styles.messageBubble,
-                msg.sender === 'user' ? styles.userMessageBubble : styles.lawyerMessageBubble
-              ]}
-            >
-              <Text
-                style={[
-                  styles.messageText,
-                  msg.sender === 'user' ? styles.userMessageText : styles.lawyerMessageText
-                ]}
-              >
-                {msg.text}
-              </Text>
-              
-              <View style={styles.messageFooter}>
-                <Text
-                  style={[
-                    styles.messageTime,
-                    msg.sender === 'user' ? styles.userMessageTime : styles.lawyerMessageTime
-                  ]}
-                >
-                  {msg.timestamp}
-                </Text>
-                {msg.sender === 'user' && (
-                  <CheckCheck 
-                    size={16} 
-                    color={msg.read ? "#10B981" : "#9CA3AF"} 
-                    style={styles.readIndicator}
-                  />
-                )}
-              </View>
-            </View>
-          </View>
-        ))}
+        {messages.map(renderMessage)}
       </ScrollView>
 
-      {/* Input Area */}
       <View style={styles.inputContainer}>
-        <View style={styles.inputRow}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Paperclip size={20} color="#6B7280" />
-          </TouchableOpacity>
-          
-          <TextInput
-            style={styles.textInput}
-            placeholder="Digite sua mensagem..."
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            maxLength={1000}
-          />
-          
-          <TouchableOpacity
-            style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!message.trim()}
-          >
-            <Send size={20} color={message.trim() ? "#FFFFFF" : "#9CA3AF"} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.attachButton}><Paperclip size={20} color="#6B7280" /></TouchableOpacity>
+        <TextInput style={styles.textInput} placeholder="Digite sua mensagem..." value={newMessage} onChangeText={setNewMessage} multiline />
+        <TouchableOpacity style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} onPress={handleSendMessage} disabled={!newMessage.trim() || sending}>
+          {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={20} color="#FFFFFF" />}
+        </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -217,98 +187,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  header: {
-    backgroundColor: '#1E40AF',
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  loadingContainer: {
     flex: 1,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  lawyerName: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  lawyerSpecialty: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#E0E7FF',
-  },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  headerButton: {
-    padding: 8,
-    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   messagesContainer: {
     flex: 1,
-  },
-  messagesContent: {
-    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   messageContainer: {
     flexDirection: 'row',
     marginBottom: 16,
-    paddingHorizontal: 24,
+    alignItems: 'flex-end',
+    gap: 8,
   },
-  userMessageContainer: {
+  myMessageContainer: {
     justifyContent: 'flex-end',
   },
-  lawyerMessageContainer: {
+  otherMessageContainer: {
     justifyContent: 'flex-start',
-  },
-  messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-    marginTop: 4,
   },
   messageBubble: {
     maxWidth: '75%',
     padding: 12,
     borderRadius: 16,
   },
-  userMessageBubble: {
-    backgroundColor: '#1E40AF',
+  myMessageBubble: {
+    backgroundColor: '#006CFF',
     borderBottomRightRadius: 4,
-    alignSelf: 'flex-end',
   },
-  lawyerMessageBubble: {
+  otherMessageBubble: {
     backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 4,
     shadowColor: '#000',
@@ -317,73 +226,58 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  senderName: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
   messageText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     lineHeight: 22,
-    marginBottom: 4,
   },
-  userMessageText: {
-    color: '#FFFFFF',
-  },
-  lawyerMessageText: {
-    color: '#1F2937',
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
+  myMessageText: { color: '#FFFFFF' },
+  otherMessageText: { color: '#1F2937' },
   messageTime: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: 11,
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
-  userMessageTime: {
-    color: '#E0E7FF',
-  },
-  lawyerMessageTime: {
-    color: '#9CA3AF',
-  },
-  readIndicator: {
-    marginLeft: 4,
-  },
+  myMessageTime: { color: 'rgba(255, 255, 255, 0.7)' },
+  otherMessageTime: { color: '#9CA3AF' },
   inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  attachButton: {
-    padding: 12,
-    marginRight: 8,
-  },
+  attachButton: { padding: 8, marginRight: 8 },
   textInput: {
     flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#1F2937',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 8,
     maxHeight: 100,
-    minHeight: 44,
+    backgroundColor: '#F9FAFB',
   },
   sendButton: {
+    backgroundColor: '#006CFF',
+    borderRadius: 20,
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E40AF',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
-  sendButtonDisabled: {
-    backgroundColor: '#E5E7EB',
-  },
+  sendButtonDisabled: { backgroundColor: '#9CA3AF' },
 });

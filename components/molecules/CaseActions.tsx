@@ -1,6 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Eye, MessageCircle, FileText, Calendar } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { Eye, MessageCircle, FileText, Calendar, MessageSquare, Video, Share2, Download } from 'lucide-react-native';
+import { useNavigation } from 'expo-router';
+import { useCase } from '@/lib/hooks/useCases';
+import { downloadCaseReport } from '@/lib/services/reports';
+import { useState } from 'react';
 
 interface CaseActionsProps {
   onViewDetails?: () => void;
@@ -21,6 +25,27 @@ export default function CaseActions({
   showSummary = false,
   showSchedule = false
 }: CaseActionsProps) {
+  const { data: caseData, isLoading } = useCase(caseId);
+  const router = useNavigation();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  if (isLoading || !caseData) {
+    return null;
+  }
+
+  const handleExport = async () => {
+    if (isDownloading) return;
+
+    setIsDownloading(true);
+    try {
+      await downloadCaseReport(caseId);
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível exportar o relatório. Tente novamente.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (variant === 'compact') {
     return (
       <View style={styles.compactContainer}>
@@ -70,6 +95,35 @@ export default function CaseActions({
           <Text style={styles.actionButtonText}>Agendar</Text>
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={() => router.push(`/pre-hiring-chat/${caseData.id}`)}
+      >
+        <MessageSquare size={20} color="#334155" />
+        <Text style={styles.actionButtonText}>Chat</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={() => console.log('Iniciar videochamada...')}
+      >
+        <Video size={20} color="#3B82F6" />
+        <Text style={styles.actionButtonText}>Videochamada</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={handleExport}
+        disabled={isDownloading}
+      >
+        {isDownloading ? (
+          <ActivityIndicator size="small" color="#10B981" />
+        ) : (
+          <Download size={20} color="#10B981" />
+        )}
+        <Text style={styles.actionButtonText}>Exportar PDF</Text>
+      </TouchableOpacity>
     </View>
   );
 }

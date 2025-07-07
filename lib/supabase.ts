@@ -1,12 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { PostgrestError } from '@supabase/supabase-js';
 
-// Configuração do Supabase - em produção usar variáveis de ambiente
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// Configuração do Supabase - com fallbacks para desenvolvimento
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'http://localhost:54321';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeo-s3C13nNhVOQnJbLUgJdHNTMJJBQYBzk';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase URL and Anon Key must be provided in environment variables.");
+// Log para debug (apenas em desenvolvimento)
+if (__DEV__) {
+  console.log('Supabase URL:', supabaseUrl);
+  console.log('Supabase Anon Key:', supabaseAnonKey ? 'Loaded' : 'Missing');
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -18,24 +20,50 @@ export interface Lawyer {
   oab_number: string;
   primary_area: string;
   specialties: string[];
+  avatar_url?: string;
+  is_available: boolean;
   rating: number;
   review_count: number;
-  experience: number;
-  avatar_url: string;
   lat: number;
   lng: number;
-  distance_km?: number;
+  experience: number;
   response_time: string;
   success_rate: number;
   hourly_rate: number;
   consultation_fee: number;
-  is_available: boolean;
-  is_approved: boolean;
   next_availability: string;
   languages: string[];
   consultation_types: string[];
-  created_at: string;
-  updated_at: string;
+  is_approved: boolean;
+  bio?: string;
+  education?: string[];
+  certifications?: string[];
+  professional_experience?: string[];
+  skills?: string[];
+  awards?: string[];
+  publications?: string[];
+  bar_associations?: string[];
+  practice_areas?: string[];
+  phone?: string;
+  email?: string;
+  website?: string;
+  linkedin?: string;
+  office_address?: string;
+  office_hours?: string;
+  graduation_year?: number;
+  postgraduate_courses?: string[];
+  current_cases_count?: number;
+  total_cases_count?: number;
+  specialization_years?: any;
+  professional_summary?: string;
+  availability_schedule?: any;
+  consultation_methods?: string[];
+  emergency_availability?: boolean;
+  profile_completion_percentage?: number;
+  cv_processed_at?: string;
+  profile_updated_at?: string;
+  success_status?: 'V' | 'P' | 'N';
+  oab_inscription_date?: string;
 }
 
 // Interface para os parâmetros da função lawyers_nearby
@@ -51,26 +79,8 @@ export interface LawyersNearbyParams {
 }
 
 // Interface para o resultado da busca
-export interface LawyerSearchResult {
-  id: string;
-  name: string;
-  oab_number: string;
-  primary_area: string;
-  rating: number;
-  review_count: number;
-  experience: number;
-  avatar_url: string;
-  lat: number;
-  lng: number;
-  distance_km: number;
-  response_time: string;
-  success_rate: number;
-  hourly_rate: number;
-  consultation_fee: number;
-  is_available: boolean;
-  next_availability: string;
-  languages: string[];
-  consultation_types: string[];
+export interface LawyerSearchResult extends Lawyer {
+  distance_km?: number;
 }
 
 // Serviço para buscar advogados próximos
@@ -106,7 +116,6 @@ export class LawyerService {
    * Busca advogado por ID
    */
   static async getLawyerById(id: string): Promise<Lawyer | null> {
-    try {
       const { data, error } = await supabase
         .from('lawyers')
         .select('*')
@@ -114,15 +123,10 @@ export class LawyerService {
         .single();
 
       if (error) {
-        console.error('Erro ao buscar advogado:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Erro ao buscar advogado:', error);
+      console.error('Error fetching lawyer by ID:', error);
       return null;
     }
+    return data;
   }
 
   /**
@@ -307,6 +311,21 @@ export class LawyerService {
       console.error('Exceção ao criar advogado:', error);
       return { data: null, error };
     }
+  }
+
+  static async updateLawyer(id: string, updates: Partial<Lawyer>): Promise<Lawyer | null> {
+    const { data, error } = await supabase
+      .from('lawyers')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar advogado:', error);
+      return null;
+    }
+    return data;
   }
 }
 

@@ -7,7 +7,24 @@ module.exports = defineConfig([
   {
     settings: {
       'import/resolver': {
-        typescript: {},
+        typescript: {
+          alwaysTryTypes: true,
+          project: './tsconfig.json',
+        },
+        node: {
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        },
+        alias: {
+          map: [
+            ['@', './'],
+            ['@/lib', './lib'],
+            ['@/components', './components'],
+            ['@/app', './app'],
+            ['@/assets', './assets'],
+            ['@/hooks', './hooks'],
+          ],
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        },
       },
     },
     ignores: ["dist/*"],

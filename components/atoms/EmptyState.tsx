@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LucideIcon } from 'lucide-react-native';
 
 interface EmptyStateProps {
-  icon?: LucideIcon;
+  icon?: React.ComponentType<{ size: number; color: string }>;
   title: string;
   description?: string;
   actionText?: string;
@@ -36,27 +35,27 @@ export default function EmptyState({
   return (
     <View style={[styles.container, styles[size]]}>
       {Icon && (
-        <View style={[styles.iconContainer, styles[`iconContainer${variant.charAt(0).toUpperCase() + variant.slice(1)}`]]}>
+        <View style={[styles.iconContainer, styles[`iconContainer${variant.charAt(0).toUpperCase() + variant.slice(1)}` as keyof typeof styles]]}>
           <Icon size={iconSize} color={iconColor} />
         </View>
       )}
       
-      <Text style={[styles.title, styles[`title${size.charAt(0).toUpperCase() + size.slice(1)}`]]}>
+      <Text style={[styles.title, styles[`title${size.charAt(0).toUpperCase() + size.slice(1)}` as keyof typeof styles]]}>
         {title}
       </Text>
       
       {description && (
-        <Text style={[styles.description, styles[`description${size.charAt(0).toUpperCase() + size.slice(1)}`]]}>
+        <Text style={[styles.description, styles[`description${size.charAt(0).toUpperCase() + size.slice(1)}` as keyof typeof styles]]}>
           {description}
         </Text>
       )}
       
       {actionText && onAction && (
         <TouchableOpacity 
-          style={[styles.actionButton, styles[`actionButton${variant.charAt(0).toUpperCase() + variant.slice(1)}`]]}
+          style={[styles.actionButton, styles[`actionButton${variant.charAt(0).toUpperCase() + variant.slice(1)}` as keyof typeof styles]]}
           onPress={onAction}
         >
-          <Text style={[styles.actionButtonText, styles[`actionButtonText${variant.charAt(0).toUpperCase() + variant.slice(1)}`]]}>
+          <Text style={[styles.actionButtonText, styles[`actionButtonText${variant.charAt(0).toUpperCase() + variant.slice(1)}` as keyof typeof styles]]}>
             {actionText}
           </Text>
         </TouchableOpacity>
@@ -159,4 +158,4 @@ const styles = StyleSheet.create({
   actionButtonTextInfo: {
     color: '#FFFFFF',
   },
-}); 
+});

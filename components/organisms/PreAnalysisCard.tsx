@@ -1,294 +1,228 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Bot, FileText, Star, Clock } from 'lucide-react-native';
+import { Briefcase, AlertTriangle, FileText, DollarSign, Shield, ArrowRight } from 'lucide-react-native';
 import Badge from '../atoms/Badge';
-import MoneyTile from '../atoms/MoneyTile';
+import ProgressBar from '../atoms/ProgressBar';
 
-interface PreAnalysisCardProps {
-  caseTitle: string;
-  analysisDate: string;
-  confidence: number; // 0-100
-  estimatedCost?: number;
-  riskLevel: 'low' | 'medium' | 'high';
-  keyPoints: string[];
-  onViewFull?: () => void;
-  onScheduleConsult?: () => void;
-}
+type PreAnalysisCardProps = {
+  area: string;
+  priority: 'high' | 'medium' | 'low';
+  urgencyLevel: number;
+  summary: string;
+  requiredDocuments: string[];
+  consultationCost: number;
+  representationCost: number;
+  riskAssessment: string;
+  onViewFull: () => void;
+};
 
-export default function PreAnalysisCard({
-  caseTitle,
-  analysisDate,
-  confidence,
-  estimatedCost,
-  riskLevel,
-  keyPoints,
+const PreAnalysisCard: React.FC<PreAnalysisCardProps> = ({
+  area,
+  priority,
+  urgencyLevel,
+  summary,
+  requiredDocuments,
+  consultationCost,
+  representationCost,
+  riskAssessment,
   onViewFull,
-  onScheduleConsult
-}: PreAnalysisCardProps) {
-  const getRiskBadgeIntent = () => {
-    switch (riskLevel) {
-      case 'low':
-        return 'success';
-      case 'medium':
-        return 'warning';
-      case 'high':
-        return 'danger';
-      default:
-        return 'neutral';
-    }
-  };
-
-  const getRiskText = () => {
-    switch (riskLevel) {
-      case 'low':
-        return 'Risco Baixo';
-      case 'medium':
-        return 'Risco Médio';
-      case 'high':
-        return 'Risco Alto';
-      default:
-        return 'Risco Indefinido';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+}) => {
+  const urgencyColor = urgencyLevel > 7 ? '#EF4444' : urgencyLevel > 4 ? '#F59E0B' : '#10B981';
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#3b82f6', '#1d4ed8']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        {/* Header */}
+      <View style={styles.card}>
+      {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Bot size={24} color="#FFFFFF" />
+        <View style={styles.headerTitleContainer}>
+          <Badge label={priority.toUpperCase()} intent={priority === 'high' ? 'danger' : priority === 'medium' ? 'warning' : 'success'} outline />
+          <Text style={styles.areaText}>{area}</Text>
+        </View>
+        <TouchableOpacity style={styles.aiButton}>
+          <Text style={styles.aiButtonText}>Análise Preliminar por IA</Text>
+          <Text style={styles.aiButtonSubtitle}>Sujeita a conferência humana</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Metrics */}
+      <View style={styles.metricsContainer}>
+        <View style={styles.metricItem}>
+          <Text style={styles.metricLabel}>Nível de Urgência</Text>
+          <ProgressBar value={urgencyLevel} color={urgencyColor} />
+        </View>
+      </View>
+
+      {/* Preliminary Analysis */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Análise Preliminar</Text>
+        <Text style={styles.sectionText}>{summary}</Text>
+      </View>
+
+      {/* Required Documents */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Documentos Necessários</Text>
+        {requiredDocuments.map((doc, index) => (
+          <View key={index} style={styles.documentItem}>
+            <FileText size={16} color="#475569" />
+            <Text style={styles.documentText}>{doc}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Cost Estimation */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Estimativa de Custos</Text>
+        <View style={styles.costContainer}>
+          <View style={styles.costItem}>
+            <DollarSign size={20} color="#34D399" />
             <View>
-              <Text style={styles.title}>Pré-análise IA</Text>
-              <Text style={styles.subtitle}>{caseTitle}</Text>
+              <Text style={styles.costLabel}>Consulta</Text>
+              <Text style={styles.costValue}>R$ {consultationCost.toFixed(2)}</Text>
             </View>
           </View>
-          
-          <View style={styles.confidenceContainer}>
-            <Star size={16} color="#FFD700" />
-            <Text style={styles.confidenceText}>{confidence}%</Text>
-          </View>
-        </View>
-
-        {/* Analysis Meta */}
-        <View style={styles.metaContainer}>
-          <View style={styles.metaItem}>
-            <Clock size={14} color="#E5E7EB" />
-            <Text style={styles.metaText}>
-              {formatDate(analysisDate)}
-            </Text>
-          </View>
-          
-          <Badge 
-            label={getRiskText()}
-            intent={getRiskBadgeIntent()}
-            size="small"
-          />
-        </View>
-
-        {/* Key Points */}
-        <View style={styles.pointsContainer}>
-          <Text style={styles.pointsTitle}>Pontos Principais:</Text>
-          {keyPoints.slice(0, 3).map((point, index) => (
-            <View key={index} style={styles.pointItem}>
-              <View style={styles.pointDot} />
-              <Text style={styles.pointText}>{point}</Text>
+          <View style={styles.costItem}>
+            <Briefcase size={20} color="#60A5FA" />
+            <View>
+              <Text style={styles.costLabel}>Representação</Text>
+              <Text style={styles.costValue}>R$ {representationCost.toFixed(2)}</Text>
             </View>
-          ))}
-          {keyPoints.length > 3 && (
-            <Text style={styles.morePoints}>
-              +{keyPoints.length - 3} pontos adicionais
-            </Text>
-          )}
-        </View>
-
-        {/* Cost Estimate */}
-        {estimatedCost && (
-          <View style={styles.costContainer}>
-            <MoneyTile
-              value={estimatedCost}
-              label="Estimativa"
-              size="medium"
-              variant="secondary"
-            />
           </View>
-        )}
-
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={onViewFull}
-          >
-            <FileText size={16} color="#1e3a8a" />
-            <Text style={styles.actionButtonText}>Ver Análise Completa</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.scheduleButton}
-            onPress={onScheduleConsult}
-          >
-            <Text style={styles.scheduleButtonText}>Agendar Consulta</Text>
-          </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
+
+      {/* Risk Assessment */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Avaliação de Risco</Text>
+        <View style={styles.riskContainer}>
+          <Shield size={16} color="#475569" />
+          <Text style={styles.sectionText}>{riskAssessment}</Text>
+        </View>
+      </View>
+
+      {/* View Full Analysis Button */}
+      <TouchableOpacity style={styles.viewFullButton} onPress={onViewFull}>
+        <Text style={styles.viewFullButtonText}>Ver Análise Completa</Text>
+        <ArrowRight size={16} color="#3B82F6" />
+      </TouchableOpacity>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#6C4DFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  gradient: {
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  headerLeft: {
+  headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    gap: 12,
+    gap: 8,
+    marginBottom: 12,
   },
-  title: {
-    fontFamily: 'Inter-Bold',
+  areaText: {
+    fontFamily: 'Inter-SemiBold',
     fontSize: 18,
+    color: '#1E293B',
+  },
+  aiButton: {
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  aiButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
     color: '#FFFFFF',
   },
-  subtitle: {
+  aiButtonSubtitle: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#E5E7EB',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
-  confidenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+  metricsContainer: {
+    marginBottom: 20,
+    gap: 16,
   },
-  confidenceText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
-  metaContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: '#E5E7EB',
-  },
-  pointsContainer: {
-    marginBottom: 16,
-  },
-  pointsTitle: {
-    fontFamily: 'Inter-SemiBold',
+  metricItem: {},
+  metricLabel: {
+    fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#475569',
     marginBottom: 8,
   },
-  pointItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-    gap: 8,
+  section: {
+    marginBottom: 20,
   },
-  pointDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-    marginTop: 6,
+  sectionTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#334155',
+    marginBottom: 12,
   },
-  pointText: {
+  sectionText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
-    color: '#E5E7EB',
-    lineHeight: 18,
-    flex: 1,
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
   },
-  morePoints: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    color: '#C7D2FE',
-    fontStyle: 'italic',
-    marginTop: 4,
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  documentText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#475569',
   },
   costContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  costItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 8,
+    flex: 1,
   },
-  actionsContainer: {
-    gap: 12,
+  costLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#64748B',
   },
-  actionButton: {
+  costValue: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  riskContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  viewFullButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    marginTop: 12,
   },
-  actionButtonText: {
+  viewFullButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-    color: '#6C4DFF',
+    color: '#3B82F6',
+    marginRight: 8,
   },
-  scheduleButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  scheduleButtonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-}); 
+});
+
+export default PreAnalysisCard; 

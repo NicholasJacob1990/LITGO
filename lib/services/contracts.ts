@@ -1,5 +1,8 @@
 import supabase from '@/lib/supabase';
-import { api } from './api';
+import { getAuthHeaders } from './api';
+import Constants from 'expo-constants';
+
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
 export interface Contract {
   id: string;
@@ -25,11 +28,15 @@ export interface Contract {
   client_name?: string;
 }
 
+export type FeeModel = Contract['fee_model'];
+
 export interface CreateContractRequest {
   case_id: string;
   lawyer_id: string;
-  fee_model: Contract['fee_model'];
+  fee_model: FeeModel;
 }
+
+export type CreateContractData = CreateContractRequest;
 
 export interface SignContractRequest {
   role: 'client' | 'lawyer';
@@ -51,51 +58,145 @@ export interface DocuSignStatus {
 
 export const contractsService = {
   /**
+   * Valida modelo de honorários
+   */
+  validateFeeModel(feeModel: FeeModel): string | null {
+    if (!feeModel.type) {
+      return 'Tipo de honorário é obrigatório';
+    }
+
+    switch (feeModel.type) {
+      case 'success':
+        if (!feeModel.percent || feeModel.percent <= 0 || feeModel.percent > 100) {
+          return 'Percentual deve estar entre 1% e 100%';
+        }
+        break;
+      case 'fixed':
+        if (!feeModel.value || feeModel.value <= 0) {
+          return 'Valor fixo deve ser maior que zero';
+        }
+        break;
+      case 'hourly':
+        if (!feeModel.rate || feeModel.rate <= 0) {
+          return 'Taxa por hora deve ser maior que zero';
+        }
+        break;
+      default:
+        return 'Tipo de honorário inválido';
+    }
+
+    return null;
+  },
+
+  /**
    * Cria um novo contrato
    */
   async createContract(data: CreateContractRequest): Promise<Contract> {
-    const { data: contract } = await api.post('/contracts', data);
-    return contract;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao criar contrato');
+    }
+
+    return response.json();
   },
 
   /**
    * Busca contrato por ID
    */
   async getContract(contractId: string): Promise<Contract> {
-    const { data } = await api.get(`/contracts/${contractId}`);
-    return data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao buscar contrato');
+    }
+
+    return response.json();
   },
 
   /**
    * Lista contratos do usuário
    */
   async getContracts(status?: string): Promise<Contract[]> {
-    const params = status ? { status } : {};
-    const { data } = await api.get('/contracts', { params });
-    return data;
+    const headers = await getAuthHeaders();
+    const url = status ? `${API_URL}/contracts?status=${status}` : `${API_URL}/contracts`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao listar contratos');
+    }
+
+    return response.json();
   },
 
   /**
    * Assina contrato
    */
   async signContract(contractId: string, signData: SignContractRequest): Promise<Contract> {
-    const { data } = await api.patch(`/contracts/${contractId}/sign`, signData);
-    return data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/sign`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(signData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao assinar contrato');
+    }
+
+    return response.json();
   },
 
   /**
    * Cancela contrato
    */
   async cancelContract(contractId: string): Promise<Contract> {
-    const { data } = await api.patch(`/contracts/${contractId}/cancel`);
-    return data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/cancel`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao cancelar contrato');
+    }
+
+    return response.json();
   },
 
   /**
    * Obtém URL do PDF do contrato
    */
   async getContractPdf(contractId: string): Promise<string> {
-    const { data } = await api.get(`/contracts/${contractId}/pdf`);
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/pdf`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao obter PDF do contrato');
+    }
+
+    const data = await response.json();
     return data.doc_url;
   },
 
@@ -103,26 +204,54 @@ export const contractsService = {
    * Consulta status do envelope DocuSign
    */
   async getDocuSignStatus(contractId: string): Promise<DocuSignStatus> {
-    const { data } = await api.get(`/contracts/${contractId}/docusign-status`);
-    return data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/docusign-status`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao consultar status DocuSign');
+    }
+
+    return response.json();
   },
 
   /**
    * Baixa documento assinado do DocuSign
    */
   async downloadDocuSignDocument(contractId: string): Promise<Blob> {
-    const response = await api.get(`/contracts/${contractId}/docusign-download`, {
-      responseType: 'blob'
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/docusign-download`, {
+      method: 'GET',
+      headers,
     });
-    return response.data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao baixar documento DocuSign');
+    }
+
+    return response.blob();
   },
 
   /**
    * Sincroniza status do contrato com DocuSign
    */
   async syncDocuSignStatus(contractId: string): Promise<Contract> {
-    const { data } = await api.post(`/contracts/${contractId}/sync-docusign`);
-    return data;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/contracts/${contractId}/sync-docusign`, {
+      method: 'POST',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Falha ao sincronizar status DocuSign');
+    }
+
+    return response.json();
   },
 
   /**
@@ -158,7 +287,7 @@ export const contractsService = {
   /**
    * Formata modelo de honorários para exibição
    */
-  formatFeeModel(feeModel: Contract['fee_model']): string {
+  formatFeeModel(feeModel: FeeModel): string {
     switch (feeModel.type) {
       case 'success':
         return `Honorários de êxito: ${feeModel.percent}%`;
@@ -224,5 +353,63 @@ export const contractsService = {
       return !!contract.signed_lawyer;
     }
     return false;
+  },
+
+  /**
+   * Verifica se contrato pode ser assinado por um usuário específico
+   */
+  canBeSignedBy(contract: Contract, userId: string): boolean {
+    if (contract.status !== 'pending-signature') {
+      return false;
+    }
+    
+    // Verifica se é cliente ou advogado e se ainda não assinou
+    if (contract.client_id === userId) {
+      return !contract.signed_client;
+    }
+    if (contract.lawyer_id === userId) {
+      return !contract.signed_lawyer;
+    }
+    
+    return false;
+  },
+
+  /**
+   * Obtém texto do status do contrato
+   */
+  getStatusText(status: Contract['status']): string {
+    const statusMap: Record<Contract['status'], string> = {
+      'pending-signature': 'Pendente',
+      'active': 'Ativo',
+      'closed': 'Finalizado',
+      'canceled': 'Cancelado'
+    };
+
+    return statusMap[status] || 'Desconhecido';
+  },
+
+  /**
+   * Obtém status das assinaturas do contrato
+   */
+  getSignatureStatus(contract: Contract): {
+    clientSigned: boolean;
+    lawyerSigned: boolean;
+    allSigned: boolean;
+    pendingSignatures: string[];
+  } {
+    const clientSigned = !!contract.signed_client;
+    const lawyerSigned = !!contract.signed_lawyer;
+    const allSigned = clientSigned && lawyerSigned;
+    
+    const pendingSignatures: string[] = [];
+    if (!clientSigned) pendingSignatures.push('cliente');
+    if (!lawyerSigned) pendingSignatures.push('advogado');
+    
+    return {
+      clientSigned,
+      lawyerSigned,
+      allSigned,
+      pendingSignatures
+    };
   }
 }; 

@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Star, MapPin, Award, MessageCircle, Video, Users, ArrowRight } from 'lucide-react-native';
-import { LawyerSearchResult } from '@/lib/supabase';
+import { Star, MapPin, Award, MessageCircle, Video, Users, ArrowRight, Quote } from 'lucide-react-native';
+import { LawyerMatch } from '@/lib/services/api';
 import { useRouter } from 'expo-router';
+import ExplainabilityCard from './organisms/ExplainabilityCard';
+import LawyerCurriculumCard from './organisms/LawyerCurriculumCard';
 
 interface LawyerCardProps {
-  lawyer: LawyerSearchResult;
+  lawyer: LawyerMatch;
   onPress: () => void;
+  showExplainability?: boolean;
+  showCurriculum?: boolean;
 }
 
-const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
+const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, showExplainability = false, showCurriculum = false }) => {
   const router = useRouter();
 
   const formatPrice = (price?: number) => {
@@ -17,25 +21,32 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  const highlightReview = lawyer.review_texts && lawyer.review_texts.length > 0
+    ? lawyer.review_texts[0]
+    : null;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatarContainer}>
-          <Image source={{ uri: lawyer.avatar_url }} style={styles.avatar} />
-          {lawyer.is_available && <View style={styles.onlineIndicator} />}
-        </View>
-        <View style={styles.headerInfo}>
-          <Text style={styles.name}>{lawyer.name}</Text>
-          <Text style={styles.oab}>{lawyer.oab_number}</Text>
-          <View style={styles.specialtyChip}>
-            <Text style={styles.specialtyText}>{lawyer.primary_area}</Text>
+    <View>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
+        <View style={styles.cardHeader}>
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: lawyer.avatar_url }} style={styles.avatar} />
+            {lawyer.is_available && <View style={styles.onlineIndicator} />}
+          </View>
+          <View style={styles.headerInfo}>
+            <Text style={styles.name}>{lawyer.nome}</Text>
+            <Text style={styles.oab}>{lawyer.oab_numero}</Text>
+            {lawyer.expertise_areas && lawyer.expertise_areas.length > 0 && (
+              <View style={styles.specialtyChip}>
+                <Text style={styles.specialtyText}>{lawyer.expertise_areas[0]}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.ratingBadge}>
+            <Star size={12} color="#FFFFFF" />
+            <Text style={styles.ratingText}>{lawyer.rating?.toFixed(1)}</Text>
           </View>
         </View>
-        <View style={styles.ratingBadge}>
-          <Star size={12} color="#FFFFFF" />
-          <Text style={styles.ratingText}>{lawyer.rating?.toFixed(1)}</Text>
-        </View>
-      </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -52,6 +63,15 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
           <Text style={styles.statValue}>{lawyer.experience} anos</Text>
         </View>
       </View>
+
+      {highlightReview && (
+        <View style={styles.reviewContainer}>
+          <Quote size={14} color="#6B7280" style={styles.reviewQuoteIcon} />
+          <Text style={styles.reviewText} numberOfLines={2}>
+            {highlightReview}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.consultationRow}>
         {lawyer.consultation_types?.includes('chat') && (
@@ -109,6 +129,18 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress }) => {
         </View>
       </View>
     </TouchableOpacity>
+    
+    {showExplainability && (
+      <ExplainabilityCard lawyer={lawyer} />
+    )}
+    
+    {showCurriculum && lawyer.curriculo_json && (
+      <LawyerCurriculumCard 
+        curriculo={lawyer.curriculo_json} 
+        lawyerName={lawyer.nome} 
+      />
+    )}
+  </View>
   );
 };
 
@@ -282,6 +314,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E0F2FE',
+  },
+  reviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  reviewQuoteIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
+  reviewText: {
+    flex: 1,
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    color: '#4B5563',
+    fontStyle: 'italic',
   },
 });
 

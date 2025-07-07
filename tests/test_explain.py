@@ -4,12 +4,14 @@ Testes para o endpoint de explicações de matches.
 import pytest
 from unittest.mock import patch, MagicMock
 
+# Caminho correto para a função de autenticação
+AUTH_PATH = 'backend.auth.get_current_user'
 
 @pytest.mark.api
 def test_explain_endpoint_success(client, mock_auth, sample_explain_request):
     """Testa endpoint de explicações com sucesso."""
-    with patch('backend.routes.get_current_user', mock_auth):
-        with patch('backend.routes.generate_explanations_for_matches') as mock_explain:
+    with patch(AUTH_PATH, mock_auth):
+        with patch('backend.main_routes.generate_explanations_for_matches') as mock_explain:
             mock_explain.return_value = {
                 "test-lawyer-123": "Dr. João Silva é uma excelente opção para seu caso!",
                 "test-lawyer-456": "Dra. Maria Santos também é uma ótima escolha!"
@@ -34,7 +36,7 @@ def test_explain_endpoint_unauthorized(client, sample_explain_request):
 @pytest.mark.api
 def test_explain_endpoint_invalid_payload(client, mock_auth):
     """Testa endpoint de explicações com payload inválido."""
-    with patch('backend.routes.get_current_user', mock_auth):
+    with patch(AUTH_PATH, mock_auth):
         response = client.post("/api/explain", json={"invalid": "data"})
         assert response.status_code == 422
 
@@ -42,8 +44,8 @@ def test_explain_endpoint_invalid_payload(client, mock_auth):
 @pytest.mark.api
 def test_explain_endpoint_case_not_found(client, mock_auth, sample_explain_request):
     """Testa endpoint de explicações com caso não encontrado."""
-    with patch('backend.routes.get_current_user', mock_auth):
-        with patch('backend.routes.generate_explanations_for_matches') as mock_explain:
+    with patch(AUTH_PATH, mock_auth):
+        with patch('backend.main_routes.generate_explanations_for_matches') as mock_explain:
             mock_explain.side_effect = ValueError("Caso não encontrado")
             
             response = client.post("/api/explain", json=sample_explain_request)
@@ -56,8 +58,8 @@ def test_explain_endpoint_case_not_found(client, mock_auth, sample_explain_reque
 @pytest.mark.api
 def test_explain_endpoint_internal_error(client, mock_auth, sample_explain_request):
     """Testa endpoint de explicações com erro interno."""
-    with patch('backend.routes.get_current_user', mock_auth):
-        with patch('backend.routes.generate_explanations_for_matches') as mock_explain:
+    with patch(AUTH_PATH, mock_auth):
+        with patch('backend.main_routes.generate_explanations_for_matches') as mock_explain:
             mock_explain.side_effect = Exception("Erro na API do Claude")
             
             response = client.post("/api/explain", json=sample_explain_request)
@@ -92,7 +94,7 @@ def test_explain_service_call(mock_auth, sample_explain_request):
 @pytest.mark.integration
 def test_explain_with_mock_anthropic(client, mock_auth, mock_anthropic, sample_explain_request):
     """Testa explicações com mock do Anthropic."""
-    with patch('backend.routes.get_current_user', mock_auth):
+    with patch(AUTH_PATH, mock_auth):
         with patch('backend.explanation_service.generate_explanation') as mock_gen:
             mock_gen.return_value = "Explicação gerada pela IA"
             
@@ -106,7 +108,7 @@ def test_explain_with_mock_anthropic(client, mock_auth, mock_anthropic, sample_e
 @pytest.mark.api
 def test_explain_empty_lawyer_list(client, mock_auth):
     """Testa explicações com lista vazia de advogados."""
-    with patch('backend.routes.get_current_user', mock_auth):
+    with patch(AUTH_PATH, mock_auth):
         request_data = {
             "case_id": "test-case-123",
             "lawyer_ids": []
@@ -119,8 +121,8 @@ def test_explain_empty_lawyer_list(client, mock_auth):
 @pytest.mark.api
 def test_explain_rate_limiting(client, mock_auth, sample_explain_request):
     """Testa rate limiting do endpoint de explicações."""
-    with patch('backend.routes.get_current_user', mock_auth):
-        with patch('backend.routes.generate_explanations_for_matches') as mock_explain:
+    with patch(AUTH_PATH, mock_auth):
+        with patch('backend.main_routes.generate_explanations_for_matches') as mock_explain:
             mock_explain.return_value = {"test": "explanation"}
             
             # Simular múltiplas requisições (rate limit é 30/min)
@@ -137,8 +139,8 @@ def test_explain_performance(client, mock_auth):
     """Testa performance do endpoint de explicações."""
     import time
     
-    with patch('backend.routes.get_current_user', mock_auth):
-        with patch('backend.routes.generate_explanations_for_matches') as mock_explain:
+    with patch(AUTH_PATH, mock_auth):
+        with patch('backend.main_routes.generate_explanations_for_matches') as mock_explain:
             mock_explain.return_value = {"test": "explanation"}
             
             request_data = {

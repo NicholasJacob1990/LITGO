@@ -4,19 +4,31 @@ import { Platform } from 'react-native';
 import supabase from '@/lib/supabase';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false, // Badge deve ser controlado pelo servidor
-  }),
-});
+// Configurar o handler apenas quando necessário
+let handlerConfigured = false;
+
+const configureNotificationHandler = () => {
+  if (!handlerConfigured) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false, // Badge deve ser controlado pelo servidor
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    handlerConfigured = true;
+  }
+};
 
 export const usePushNotifications = () => {
   const { user } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState<string | undefined>();
 
   useEffect(() => {
+    // Configurar handler apenas quando o hook é usado
+    configureNotificationHandler();
     const registerForPushNotificationsAsync = async () => {
       let token;
       if (Platform.OS === 'android') {
@@ -40,7 +52,7 @@ export const usePushNotifications = () => {
       }
       
       // Use seu Project ID do EAS
-      token = (await Notifications.getExpoPushTokenAsync({ projectId: 'YOUR_EAS_PROJECT_ID' })).data;
+      token = (await Notifications.getExpoPushTokenAsync({ projectId: '2ec83ef1-3235-4926-98c2-107ef29fde7d' })).data;
       setExpoPushToken(token);
       return token;
     };

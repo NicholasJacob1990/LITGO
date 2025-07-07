@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Briefcase, CheckCircle, Clock, DollarSign, User, Search, Filter } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import supabase from '@/lib/supabase';
+import ImprovedCaseList from '@/components/organisms/ImprovedCaseList';
+import { getLawyerCases, getCaseStats, CaseData } from '@/lib/services/cases';
 
 const LawyerDashboard = () => (
   <View style={styles.dashboard}>
@@ -68,52 +70,43 @@ const CaseCard = ({ caseData }: { caseData: any }) => {
 
 export default function LawyerCasesScreen() {
   const { user } = useAuth();
-  const [cases, setCases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchCases = async () => {
-      if (!user) return;
-
-      setLoading(true);
-      const { data, error } = await supabase.rpc('get_user_cases', { p_user_id: user.id });
-
-      if (error) {
-        console.error('Erro ao buscar casos:', error);
-      } else {
-        setCases(data || []);
-      }
-      setLoading(false);
-    };
-
-    fetchCases();
+  const loadCases = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [casesData, statsData] = await Promise.all([
+        getLawyerCases(user.id), 
+        getCaseStats(user.id)
+      ]);
+      setCases(casesData);
+      setCaseStats(statsData);
+    } catch (e) {
+      setError('Falha ao carregar seus casos.');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
   }, [user]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}>
-        <ActivityIndicator size="large" color="#1E293B" />
-      </View>
-    );
-  }
+  useEffect(() => {
+    loadCases();
+  }, [loadCases]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
-        <Text style={styles.headerTitle}>Meus Casos</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity><Search size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity><Filter size={24} color="#FFFFFF" /></TouchableOpacity>
-        </View>
-      </LinearGradient>
-
-      <LawyerDashboard />
-
-      <ScrollView style={styles.listContainer}>
-        {cases.map(caseData => <CaseCard key={caseData.id} caseData={caseData} />)}
-      </ScrollView>
-    </View>
+    <ImprovedCaseList
+      cases={cases}
+      caseStats={caseStats}
+      isLoading={isLoading}
+      error={error}
+      onRefresh={loadCases}
+      headerComponent={<LawyerDashboard />}
+    />
   );
 }
 

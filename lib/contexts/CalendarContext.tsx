@@ -18,13 +18,13 @@ const CalendarContext = createContext<CalendarContextType | undefined>(undefined
 
 export const CalendarProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const userId = user?.id;
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   // Função memoizada para ser usada manualmente pelos componentes
   const refetchEvents = useCallback(async () => {
+    const userId = user?.id;
     if (!userId) {
       setEvents([]);
       setIsLoading(false);
@@ -49,19 +49,20 @@ export const CalendarProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [user?.id]);
 
-  // Carrega eventos automaticamente quando o ID do usuário estiver disponível
+  // Carrega eventos automaticamente apenas uma vez quando o componente monta
+  // e o usuário está logado
   useEffect(() => {
-    // Somente dispara quando userId mudar (inclusive de null -> valor)
-    if (userId) {
+    if (user?.id) {
       refetchEvents();
     } else {
-      // Se o usuário ainda não estiver logado, limpa os estados para evitar loops
+      // Se não há usuário, limpa os estados
       setEvents([]);
       setIsLoading(false);
+      setError(null);
     }
-  }, [userId, refetchEvents]);
+  }, [user?.id]); // Dependência apenas do user.id, não da função refetchEvents
 
   return (
     <CalendarContext.Provider value={{ events, isLoading, error, refetchEvents }}>

@@ -1,6 +1,7 @@
 # backend/triage_service.py
 import os
 import re
+
 import anthropic
 from dotenv import load_dotenv
 
@@ -9,10 +10,12 @@ load_dotenv()
 # --- Configuração do Cliente Anthropic ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+
 class TriageService:
     def __init__(self):
         if not ANTHROPIC_API_KEY:
-            print("Aviso: Chave da API da Anthropic (ANTHROPIC_API_KEY) não encontrada. Usando fallback de regex.")
+            print(
+                "Aviso: Chave da API da Anthropic (ANTHROPIC_API_KEY) não encontrada. Usando fallback de regex.")
             self.client = None
         else:
             self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -64,7 +67,8 @@ class TriageService:
         )
 
         # Extrai o conteúdo da ferramenta preenchida pelo modelo
-        if message.content and isinstance(message.content, list) and message.content[0].type == 'tool_use':
+        if message.content and isinstance(
+                message.content, list) and message.content[0].type == 'tool_use':
             tool_result = message.content[0].input
             return {
                 "area": tool_result.get("area", "Não identificado"),
@@ -74,26 +78,27 @@ class TriageService:
             }
         else:
             raise Exception("A resposta do LLM não continha os dados esperados.")
-            
+
     def _run_regex_fallback(self, text: str) -> dict:
         """
         Fallback simples que usa regex para extrair a área jurídica.
         """
         text_lower = text.lower()
-        area = "Cível" # Padrão
+        area = "Cível"  # Padrão
         if re.search(r'trabalho|demitido|empresa|salário', text_lower):
             area = "Trabalhista"
         elif re.search(r'polícia|crime|preso|roubo', text_lower):
             area = "Criminal"
         elif re.search(r'consumidor|produto|compra|loja', text_lower):
             area = "Consumidor"
-        
+
         return {
             "area": area,
             "subarea": "A ser definido",
-            "urgency_h": 72, # Urgência padrão
-            "summary": text[:150] # Pega os primeiros 150 caracteres como resumo
+            "urgency_h": 72,  # Urgência padrão
+            "summary": text[:150]  # Pega os primeiros 150 caracteres como resumo
         }
 
+
 # Instância única para ser usada na aplicação
-triage_service = TriageService() 
+triage_service = TriageService()

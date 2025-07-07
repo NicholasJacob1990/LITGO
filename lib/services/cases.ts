@@ -8,15 +8,58 @@ export interface CaseData {
   lawyer_id?: string;
   created_at: string;
   updated_at: string;
-  title?: string;
-  description?: string;
-  priority?: 'high' | 'medium' | 'low';
+  // Campos básicos do caso
+  title: string;
+  description: string;
+  area: string;
+  subarea: string;
+  priority: 'high' | 'medium' | 'low';
+  urgency_hours: number;
+  risk_level: 'high' | 'medium' | 'low';
+  confidence_score: number;
+  estimated_cost: number;
+  next_step: string;
+  // Escopo do serviço (definido pelo advogado)
+  service_scope?: string;
+  service_scope_defined_at?: string;
+  service_scope_defined_by?: string;
+  // Estrutura de honorários
+  consultation_fee: number;
+  representation_fee: number;
+  fee_type: 'fixed' | 'success' | 'hourly' | 'plan' | 'mixed';
+  success_percentage?: number;
+  hourly_rate?: number;
+  plan_type?: string;
+  payment_terms?: string;
+  // Dados do cliente
+  client_name?: string;
   client_type?: 'PF' | 'PJ';
+  // Contagem de mensagens
   unread_messages?: number;
+  // Dados do advogado
+  lawyer_name?: string;
+  lawyer_specialty?: string;
+  lawyer_avatar?: string;
+  lawyer_oab?: string;
+  lawyer_rating?: number;
+  lawyer_experience_years?: number;
+  lawyer_success_rate?: number;
+  lawyer_phone?: string;
+  lawyer_email?: string;
+  lawyer_location?: string;
+  // Interfaces para compatibilidade com componentes existentes
   lawyer?: {
+    id: string;
     name: string;
     avatar?: string;
-    specialty?: string;
+    specialty: string;
+    oab: string;
+    rating: number;
+    experience_years: number;
+    success_rate: number;
+    phone?: string;
+    email?: string;
+    location?: string;
   };
   client?: {
     name: string;
@@ -43,6 +86,20 @@ export const getUserCases = async (userId: string): Promise<CaseData[]> => {
 };
 
 /**
+ * Busca os casos de um advogado usando a função RPC corrigida
+ * @param lawyerId - O ID do advogado
+ */
+export const getLawyerCases = async (lawyerId: string): Promise<CaseData[]> => {
+  const { data, error } = await supabase.rpc('get_user_cases', { p_user_id: lawyerId });
+
+  if (error) {
+    console.error('Error fetching lawyer cases:', error);
+    throw new Error('Falha ao buscar os casos do advogado.');
+  }
+  return data || [];
+};
+
+/**
  * Busca um caso específico por ID
  * @param caseId - O ID do caso
  */
@@ -57,6 +114,26 @@ export const getCaseById = async (caseId: string): Promise<CaseData | null> => {
       lawyer_id,
       created_at,
       updated_at,
+      title,
+      description,
+      area,
+      subarea,
+      priority,
+      urgency_hours,
+      risk_level,
+      confidence_score,
+      estimated_cost,
+      next_step,
+      service_scope,
+      service_scope_defined_at,
+      service_scope_defined_by,
+      consultation_fee,
+      representation_fee,
+      fee_type,
+      success_percentage,
+      hourly_rate,
+      plan_type,
+      payment_terms,
       profiles!cases_client_id_fkey (
         full_name,
         avatar_url,
@@ -65,7 +142,14 @@ export const getCaseById = async (caseId: string): Promise<CaseData | null> => {
       profiles!cases_lawyer_id_fkey (
         full_name,
         avatar_url,
-        specialization
+        specialization,
+        oab_number,
+        rating,
+        experience_years,
+        success_rate,
+        phone,
+        email,
+        location
       )
     `)
     .eq('id', caseId)
@@ -76,7 +160,47 @@ export const getCaseById = async (caseId: string): Promise<CaseData | null> => {
     throw error;
   }
 
-  return data;
+  if (!data) return null;
+
+  // Transformar os dados para o formato esperado
+  const profiles = data.profiles as any[];
+  const clientProfile = profiles?.[0]; // Primeiro perfil é do cliente
+  const lawyerProfile = profiles?.[1]; // Segundo perfil é do advogado
+
+  return {
+    ...data,
+    client_name: clientProfile?.full_name,
+    client_type: clientProfile?.user_type,
+    lawyer_name: lawyerProfile?.full_name,
+    lawyer_specialty: lawyerProfile?.specialization,
+    lawyer_avatar: lawyerProfile?.avatar_url,
+    lawyer_oab: lawyerProfile?.oab_number,
+    lawyer_rating: lawyerProfile?.rating,
+    lawyer_experience_years: lawyerProfile?.experience_years,
+    lawyer_success_rate: lawyerProfile?.success_rate,
+    lawyer_phone: lawyerProfile?.phone,
+    lawyer_email: lawyerProfile?.email,
+    lawyer_location: lawyerProfile?.location,
+    // Criar objetos para compatibilidade
+    client: clientProfile ? {
+      name: clientProfile.full_name,
+      avatar: clientProfile.avatar_url,
+      type: clientProfile.user_type
+    } : undefined,
+    lawyer: lawyerProfile ? {
+      id: data.lawyer_id,
+      name: lawyerProfile.full_name,
+      avatar: lawyerProfile.avatar_url,
+      specialty: lawyerProfile.specialization,
+      oab: lawyerProfile.oab_number,
+      rating: lawyerProfile.rating,
+      experience_years: lawyerProfile.experience_years,
+      success_rate: lawyerProfile.success_rate,
+      phone: lawyerProfile.phone,
+      email: lawyerProfile.email,
+      location: lawyerProfile.location
+    } : undefined
+  };
 };
 
 /**
@@ -163,4 +287,20 @@ export const getCaseStats = async (userId: string) => {
   };
 
   return stats;
+};
+
+export const updateCase = async (caseId: string, updates: Partial<CaseData>) => {
+  const { data, error } = await supabase
+    .from('cases')
+    .update(updates)
+    .eq('id', caseId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating case:', error);
+    throw new Error('Falha ao atualizar o caso.');
+  }
+
+  return data;
 }; 

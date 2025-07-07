@@ -10,8 +10,9 @@ import storageService from '../../lib/storage';
 import locationService from '../../components/LocationService';
 import { extractTextFromFile } from '../../lib/downloadUtils';
 import { analyzeLawyerCV, CVAnalysisResult } from '../../lib/openai';
+import { Switch } from 'react-native-gesture-handler';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const StepIndicator = ({ currentStep }: { currentStep: number }) => {
   return (
@@ -56,6 +57,7 @@ export default function RegisterLawyer() {
     oab: '',
     oabState: '',
     specialties: '',
+    max_concurrent_cases: 10, // Default value
     // Endereço para geocodificação
     cep: '',
     street: '',
@@ -68,9 +70,15 @@ export default function RegisterLawyer() {
     oabDocumentUrl: '',
     proofOfAddressUrl: '',
     cvUrl: '',
+    // Step 4 - Diversity
+    gender: '',
+    ethnicity: '',
+    orientation: '',
+    isPCD: false,
+    isLGBTQIA: false,
   });
 
-  const handleInputChange = (name: string, value: string) => {
+  const handleInputChange = (name: string, value: string | boolean | number) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -150,22 +158,51 @@ export default function RegisterLawyer() {
           return;
       }
 
-      // Terceiro, atualiza o usuário com os metadados completos
-      const { error: updateError } = await supabase.auth.updateUser({
+      // Terceiro, atualiza o usuário com os metadados de diversidade
+      const { error: updateProfileError } = await supabase.auth.updateUser({
         data: {
-          oab,
-          specialties,
-          oab_document_url: oabUrl,
-          proof_of_address_url: addressUrl,
-          cv_url: cvUrl,
+          gender: formData.gender,
+          ethnicity: formData.ethnicity,
+          sexual_orientation: formData.orientation,
+          is_pcd: formData.isPCD,
+          lgbtqia: formData.isLGBTQIA,
         }
       });
 
-      if (updateError) {
-        // ... (tratamento de erro, talvez tentar de novo ou avisar o suporte)
+      if (updateProfileError) {
+        setLoading(false);
+        setError(`Erro ao salvar dados de perfil: ${updateProfileError.message}`);
+        Alert.alert('Erro na Habilitação', 'Não foi possível salvar seus dados de perfil.');
+        await supabase.auth.admin.deleteUser(user.id);
+        return;
       }
 
-      // Quarto, se há análise de CV, salvar no banco de dados
+      // Quarto, insere os dados profissionais na tabela 'lawyers'
+      const lawyerData = {
+          id: user.id, // Garante o mesmo ID
+          name: fullName,
+          oab_number: oab,
+          specialties: formData.specialties.split(',').map(s => s.trim()),
+          max_concurrent_cases: Number(formData.max_concurrent_cases),
+          lat: location.latitude,
+          lng: location.longitude,
+          avatar_url: '', // Pode ser preenchido depois
+          oab_document_url: oabUrl,
+          proof_of_address_url: addressUrl,
+          cv_url: cvUrl,
+      };
+
+      const { error: lawyerInsertError } = await supabase.from('lawyers').insert([lawyerData]);
+
+      if (lawyerInsertError) {
+        setLoading(false);
+        setError(`Erro ao salvar dados profissionais: ${lawyerInsertError.message}`);
+        Alert.alert('Erro na Habilitação', 'Não foi possível salvar seus dados profissionais.');
+        await supabase.auth.admin.deleteUser(user.id);
+        return;
+      }
+
+      // Quinto, se há análise de CV, salvar no banco de dados
       if (cvAnalysis && cvUrl) {
         try {
           await saveCVAnalysis(user.id, cvUrl, cvAnalysis);
@@ -294,6 +331,19 @@ export default function RegisterLawyer() {
     }
   };
 
+  const SwitchField = ({ label, value, onValueChange }: { label: string, value: boolean, onValueChange: (value: boolean) => void }) => (
+    <View style={styles.switchContainer}>
+      <Text style={styles.switchLabel}>{label}</Text>
+      <Switch
+        trackColor={{ false: "#E5E7EB", true: "#3B82F6" }}
+        thumbColor={value ? "#FFFFFF" : "#f4f3f4"}
+        ios_backgroundColor="#E5E7EB"
+        onValueChange={onValueChange}
+        value={value}
+      />
+    </View>
+  );
+
   const renderStepContent = () => {
     switch (step) {
       case 1:
@@ -325,6 +375,7 @@ export default function RegisterLawyer() {
             <Text style={styles.stepTitle}>2. Dados Profissionais e Endereço</Text>
             <TextInput style={styles.input} placeholder="Nº da OAB (com UF, ex: 12345/SP)" value={formData.oab} onChangeText={v => handleInputChange('oab', v)} />
             <TextInput style={styles.input} placeholder="Principais áreas de atuação (separadas por vírgula)" value={formData.specialties} onChangeText={v => handleInputChange('specialties', v)} />
+            <TextInput style={styles.input} placeholder="Nº máximo de casos simultâneos" value={String(formData.max_concurrent_cases)} onChangeText={v => handleInputChange('max_concurrent_cases', Number(v.replace(/[^0-9]/g, '')))} keyboardType="numeric" />
             
             <Text style={styles.sectionTitle}>Endereço Profissional</Text>
             <TextInput style={styles.input} placeholder="CEP" value={formData.cep} onChangeText={v => handleInputChange('cep', v)} keyboardType="numeric" maxLength={8} />
@@ -403,7 +454,32 @@ export default function RegisterLawyer() {
       case 4:
          return (
           <View>
-            <Text style={styles.stepTitle}>4. Termos e Contrato</Text>
+            <Text style={styles.stepTitle}>4. Informações de Diversidade (Opcional)</Text>
+            <Text style={styles.diversityInfoText}>
+              A LITGO se compromete com a promoção de um ecossistema jurídico mais justo e diverso. 
+              Estas informações, se fornecidas, serão usadas exclusivamente para garantir que nosso algoritmo 
+              de match possa identificar e promover ativamente a equidade na distribuição de casos.
+            </Text>
+            <TextInput style={styles.input} placeholder="Gênero (ex: Mulher, Homem, Não-binário)" value={formData.gender} onChangeText={v => handleInputChange('gender', v)} />
+            <TextInput style={styles.input} placeholder="Etnia / Cor (ex: Branca, Negra, Parda)" value={formData.ethnicity} onChangeText={v => handleInputChange('ethnicity', v)} />
+            <TextInput style={styles.input} placeholder="Orientação Sexual (ex: Heterossexual, Gay)" value={formData.orientation} onChangeText={v => handleInputChange('orientation', v)} />
+            
+            <SwitchField 
+              label="Você é uma pessoa com deficiência (PCD)?"
+              value={formData.isPCD}
+              onValueChange={v => handleInputChange('isPCD', v)}
+            />
+            <SwitchField 
+              label="Você se identifica como parte da comunidade LGBTQIA+?"
+              value={formData.isLGBTQIA}
+              onValueChange={v => handleInputChange('isLGBTQIA', v)}
+            />
+          </View>
+        );
+      case 5:
+         return (
+          <View>
+            <Text style={styles.stepTitle}>5. Termos e Contrato</Text>
             <Text style={styles.termsText}>Ao clicar em &ldquo;Finalizar&rdquo;, você declara que leu e concorda com os Termos de Parceria e a Política de Privacidade da LITGO.</Text>
           </View>
         );
@@ -552,5 +628,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 16,
     paddingHorizontal: 8,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginBottom: 16,
+  },
+  switchLabel: {
+    fontSize: 15,
+    fontFamily: 'Inter-Regular',
+    color: '#374151',
+    flex: 1,
+  },
+  diversityInfoText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
   },
 }); 

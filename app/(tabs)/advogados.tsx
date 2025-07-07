@@ -6,41 +6,49 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter, useLocalSearchParams , Stack } from 'expo-router';
 import LawyerCard from '@/components/LawyerCard';
 import MapComponent from '@/components/MapComponent';
-import supabase, { LawyerService, LawyerSearchResult, LawyersNearbyParams, assignLawyerToCase , Lawyer } from '@/lib/supabase';
-import LocationService from '@/components/LocationService';
+import { useLawyers } from '@/lib/hooks/useLawyers';
+import { LawyerMatch } from '@/lib/services/api';
+import { assignLawyerToCase } from '@/lib/supabase';
+import LocationService, { UserLocation } from '@/components/LocationService';
 import Slider from '@react-native-community/slider';
 
-// Adicionando dados mockados para visualização
-const mockLawyers: LawyerSearchResult[] = [
-    {
-        id: 'mock-1', name: 'Dr. Ana Silva', oab_number: 'OAB/SP 123.456', primary_area: 'Direito Civil',
-        rating: 4.8, review_count: 127, experience: 8, avatar_url: 'https://i.pravatar.cc/150?u=a01',
-        distance_km: 0.5, is_available: true, lat: 0, lng: 0,
-        consultation_types: ['chat', 'video', 'presential'], consultation_fee: 150,
-        response_time: '10min', success_rate: 98, hourly_rate: 300, next_availability: 'Amanhã', languages: ['Português', 'Inglês']
-    },
-    {
-        id: 'mock-2', name: 'Dra. Maria Santos', oab_number: 'OAB/SP 345.678', primary_area: 'Direito do Consumidor',
-        rating: 4.9, review_count: 203, experience: 15, avatar_url: 'https://i.pravatar.cc/150?u=a02',
-        distance_km: 2.1, is_available: true, lat: 0, lng: 0,
-        consultation_types: ['chat', 'video'], consultation_fee: 200,
-        response_time: '30min', success_rate: 95, hourly_rate: 400, next_availability: 'Hoje', languages: ['Português']
-    },
-];
+// Adicionando dados mockados para visualização - SERÁ REMOVIDO
+// const mockLawyers: LawyerSearchResult[] = [
+//     {
+//         id: 'mock-1', name: 'Dr. Ana Silva', oab_number: 'OAB/SP 123.456', primary_area: 'Direito Civil',
+//         rating: 4.8, review_count: 127, experience: 8, avatar_url: 'https://i.pravatar.cc/150?u=a01',
+//         distance_km: 0.5, is_available: true, lat: 0, lng: 0,
+//         consultation_types: ['chat', 'video', 'presential'], consultation_fee: 150,
+//         response_time: '10min', success_rate: 98, hourly_rate: 300, next_availability: 'Amanhã', languages: ['Português', 'Inglês']
+//     },
+//     {
+//         id: 'mock-2', name: 'Dra. Maria Santos', oab_number: 'OAB/SP 345.678', primary_area: 'Direito do Consumidor',
+//         rating: 4.9, review_count: 203, experience: 15, avatar_url: 'https://i.pravatar.cc/150?u=a02',
+//         distance_km: 2.1, is_available: true, lat: 0, lng: 0,
+//         consultation_types: ['chat', 'video'], consultation_fee: 200,
+//         response_time: '30min', success_rate: 95, hourly_rate: 400, next_availability: 'Hoje', languages: ['Português']
+//     },
+// ];
 
 function LawyerSelectionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [preset, setPreset] = useState<'balanced' | 'fast' | 'expert' | 'economic'>('balanced');
+  const [complexity, setComplexity] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
   const [selectedRadius, setSelectedRadius] = useState(20);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [availableNow, setAvailableNow] = useState(false);
   const [minRating, setMinRating] = useState(3);
+  
+  // Estados para filtros por tier
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+
   const [consultationType, setConsultationType] = useState<'chat' | 'video' | 'presential'>('chat');
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [selectedLawyer, setSelectedLawyer] = useState<LawyerSearchResult | null>(null);
+  const [selectedLawyer, setSelectedLawyer] = useState<LawyerMatch | null>(null);
   const [mapRegion, setMapRegion] = useState<{
     latitude: number;
     longitude: number;
@@ -49,14 +57,36 @@ function LawyerSelectionScreen() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [lawyers, setLawyers] = useState<LawyerSearchResult[]>([]);
-  const [filteredLawyers, setFilteredLawyers] = useState<LawyerSearchResult[]>([]);
+  const [lawyers, setLawyers] = useState<LawyerMatch[]>([]);
+  const [filteredLawyers, setFilteredLawyers] = useState<LawyerMatch[]>([]);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const filterAnimation = useRef(new Animated.Value(0)).current;
 
   // Novo estado para o loading inicial
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // Integração com o hook useLawyers (T-1.1.2)
+  const { 
+    data: fetchedLawyers, 
+    isLoading: isLoadingLawyers, 
+    error: lawyersError,
+    refetch: refetchLawyers
+  } = useLawyers({
+    area: selectedAreas.length > 0 ? selectedAreas[0] : undefined,
+    preset: preset,
+    complexity: complexity,
+    coordinates: userLocation ? {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+    } : {
+      latitude: -23.5505,
+      longitude: -46.6333
+    },
+          name: searchQuery || undefined,
+      tiers: selectedTiers,
+  });
 
   const legalAreas = [
     'Direito Trabalhista',
@@ -87,47 +117,36 @@ function LawyerSelectionScreen() {
     if (params.caseId && typeof params.caseId === 'string') {
       setCaseId(params.caseId);
     }
+    // Busca inicial de advogados
+    refetchLawyers();
     const handler = setTimeout(() => {
       fetchLawyers();
-    }, 500);
+    }, 500); // Debounce para filtros
     return () => clearTimeout(handler);
-  }, [selectedRadius, selectedAreas, availableNow, minRating, searchQuery]);
+  }, [selectedRadius, selectedAreas, availableNow, minRating, searchQuery, refetchLawyers, selectedTiers]);
+
+  useEffect(() => {
+    if (fetchedLawyers) {
+      setLawyers(fetchedLawyers);
+      setIsInitialLoading(false);
+      setIsLoading(false);
+    }
+  }, [fetchedLawyers]);
+
+  useEffect(() => {
+    if (lawyersError) {
+        setLocationError(lawyersError.message);
+        setIsInitialLoading(false);
+        setIsLoading(false);
+    }
+  }, [lawyersError]);
 
   useEffect(() => {
     setFilteredLawyers(lawyers);
   }, [lawyers]);
 
-  useEffect(() => {
-    // Simula o carregamento dos dados
-    setTimeout(() => {
-      setLawyers(mockLawyers);
-      setMapRegion({ 
-        latitude: -23.5505, 
-        longitude: -46.6333,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      }); // Localização mockada
-      setIsInitialLoading(false); // Desativa o loading inicial
-      setIsLoading(false);
-    }, 1000);
-  }, []);
-
   const fetchLawyers = () => {
-    // A busca real está temporariamente desativada para usar os mocks.
-    // A lógica original será mantida para reativar facilmente.
-    setIsLoading(true);
-    let filteredData = mockLawyers;
-    if (searchQuery) {
-        filteredData = mockLawyers.filter((lawyer) =>
-          lawyer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (lawyer.primary_area && lawyer.primary_area.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-    }
-    // Simula uma pequena demora da rede
-    setTimeout(() => {
-        setLawyers(filteredData);
-        setIsLoading(false);
-    }, 500);
+    refetchLawyers();
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -153,11 +172,11 @@ function LawyerSelectionScreen() {
     // Kept for potential future client-side logic.
   };
 
-  const handleLawyerSelect = (lawyer: LawyerSearchResult) => {
+  const handleLawyerSelect = (lawyer: LawyerMatch) => {
     setSelectedLawyer(lawyer);
   };
 
-  const handleLawyerPress = (lawyer: LawyerSearchResult) => {
+  const handleLawyerPress = (lawyer: LawyerMatch) => {
     // Navegar para tela de detalhes do advogado
     router.push({
       pathname: '/(tabs)/lawyer-details',
@@ -176,9 +195,9 @@ function LawyerSelectionScreen() {
       await assignLawyerToCase(caseId, selectedLawyer.id);
       Alert.alert(
         "Advogado Atribuído!",
-        `${selectedLawyer.name} foi atribuído ao seu caso. Você será notificado quando ele(a) enviar a primeira mensagem.`,
+        `${selectedLawyer.nome} foi atribuído ao seu caso. Você será notificado quando ele(a) enviar a primeira mensagem.`,
         [
-          { text: "OK", onPress: () => router.replace('/(tabs)/cases') }
+          { text: "OK", onPress: () => router.replace('../cases') }
         ]
       );
     } catch (error) {
@@ -197,6 +216,8 @@ function LawyerSelectionScreen() {
     setConsultationType('chat');
     setSelectedRadius(20);
     setSearchQuery('');
+    // Limpar filtros de tier
+    setSelectedTiers([]);
   };
 
   const toggleFilters = () => {
@@ -208,7 +229,7 @@ function LawyerSelectionScreen() {
     setShowFilters(!showFilters);
   };
 
-  const renderLawyerCard = ({ item }: { item: LawyerSearchResult }) => (
+  const renderLawyerCard = ({ item }: { item: LawyerMatch }) => (
     <LawyerCard 
       lawyer={item}
       onPress={() => handleLawyerPress(item)}
@@ -243,7 +264,7 @@ function LawyerSelectionScreen() {
   );
 
   const renderEmptyList = () => {
-    if (isLoading) {
+    if (isLoadingLawyers) {
       return <ActivityIndicator size="large" color="#1E40AF" style={{ marginTop: 50 }} />;
     }
     if (locationError) {
@@ -272,6 +293,36 @@ function LawyerSelectionScreen() {
       <Animated.View style={[styles.filtersContainer, { transform: [{ translateY: filterTranslateY }] }]}>
         <ScrollView>
             <Text style={styles.filterTitle}>Filtros Avançados</Text>
+            
+            <Text style={styles.label}>Critério de Busca</Text>
+            <View style={styles.segmentedControl}>
+              {['balanced', 'expert', 'fast', 'economic'].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.segmentedButton, preset === p && styles.segmentedButtonActive]}
+                  onPress={() => setPreset(p as any)}
+                >
+                  <Text style={[styles.segmentedButtonText, preset === p && styles.segmentedButtonTextActive]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Complexidade do Caso</Text>
+            <View style={styles.segmentedControl}>
+              {['LOW', 'MEDIUM', 'HIGH'].map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.segmentedButton, complexity === c && styles.segmentedButtonActive]}
+                  onPress={() => setComplexity(c as any)}
+                >
+                  <Text style={[styles.segmentedButtonText, complexity === c && styles.segmentedButtonTextActive]}>
+                    {c.charAt(0).toUpperCase() + c.slice(1).toLowerCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             
             <Text style={styles.label}>Raio de Distância: {selectedRadius} km</Text>
             <Slider
@@ -314,6 +365,32 @@ function LawyerSelectionScreen() {
                 maximumTrackTintColor="#D1D5DB"
                 thumbTintColor="#1E40AF"
             />
+
+            <Text style={styles.label}>Nível de Advogado</Text>
+            <View style={styles.tagContainer}>
+              {[
+                { key: 'junior', label: 'Júnior (R$ 150 - R$ 200/h)', description: 'Até 3 anos de experiência' },
+                { key: 'pleno', label: 'Pleno (R$ 300 - R$ 400/h)', description: '4 a 10 anos de experiência' },
+                { key: 'senior', label: 'Sênior (R$ 500 - R$ 600/h)', description: 'Mais de 10 anos de experiência' },
+                { key: 'especialista', label: 'Especialista (R$ 800 - R$ 1000/h)', description: 'Altamente especializado' }
+              ].map(tier => (
+                <TouchableOpacity 
+                  key={tier.key}
+                  style={[styles.tierTag, selectedTiers.includes(tier.key) && styles.tierTagSelected]}
+                  onPress={() => {
+                    setSelectedTiers(prev => 
+                      prev.includes(tier.key) ? prev.filter(t => t !== tier.key) : [...prev, tier.key]
+                    )
+                  }}>
+                  <Text style={[styles.tierTagText, selectedTiers.includes(tier.key) && styles.tierTagTextSelected]}>
+                    {tier.label}
+                  </Text>
+                  <Text style={[styles.tierTagDescription, selectedTiers.includes(tier.key) && styles.tierTagDescriptionSelected]}>
+                    {tier.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             
             <View style={styles.switchContainer}>
                 <Text style={styles.label}>Disponível Agora</Text>
@@ -382,7 +459,7 @@ function LawyerSelectionScreen() {
         </View>
       ) : (
         <>
-          {isLoading && (
+          {isLoadingLawyers && (
             <View style={styles.listLoaderOverlay}>
               <ActivityIndicator size="large" color="#1E40AF" />
             </View>
@@ -394,12 +471,14 @@ function LawyerSelectionScreen() {
           ) : (
             viewMode === 'list' ? (
               <FlatList
-                ListHeaderComponent={() => <Text style={styles.infoText}>Nenhum advogado encontrado perto de você. Mostrando exemplos.</Text>}
+                ListHeaderComponent={() => <Text style={styles.infoText}>{lawyers.length} advogados encontrados.</Text>}
                 data={lawyers}
                 renderItem={({ item }) => (
                   <LawyerCard 
                     lawyer={item}
                     onPress={() => handleLawyerPress(item)}
+                    showExplainability={true}
+                    showCurriculum={true}
                   />
                 )}
                 keyExtractor={item => item.id}
@@ -670,6 +749,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     fontFamily: 'Inter-SemiBold',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  segmentedButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  segmentedButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  segmentedButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#374151',
+  },
+  segmentedButtonTextActive: {
+    color: '#1E40AF',
+  },
+  tierTag: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tierTagSelected: {
+    backgroundColor: '#EBF4FF',
+    borderColor: '#1E40AF',
+  },
+  tierTagText: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  tierTagTextSelected: {
+    color: '#1E40AF',
+  },
+  tierTagDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  tierTagDescriptionSelected: {
+    color: '#1E40AF',
   },
 });
 

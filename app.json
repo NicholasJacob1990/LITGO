@@ -1,16 +1,30 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "LITGO5",
+    "slug": "litgo5",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "litgo5",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.boltexponativewind"
+      "bundleIdentifier": "com.litgo.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "LITGO5 precisa de acesso à câmera para videochamadas e digitalização de documentos.",
+        "NSMicrophoneUsageDescription": "LITGO5 precisa de acesso ao microfone para videochamadas.",
+        "NSPhotoLibraryUsageDescription": "LITGO5 precisa de acesso à galeria para envio de documentos."
+      }
+    },
+    "android": {
+      "package": "com.litgo.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -30,16 +44,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "O LITGO precisa de acesso à sua galeria para que você possa enviar seus documentos.",
-          "cameraPermission": "O LITGO precisa de acesso à sua câmera para que você possa digitalizar seus documentos."
+          "photosPermission": "O LITGO5 precisa de acesso à sua galeria para que você possa enviar seus documentos.",
+          "cameraPermission": "O LITGO5 precisa de acesso à sua câmera para que você possa digitalizar seus documentos."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "android": {
-      "package": "com.anonymous.boltexponativewind"
     }
   }
 }

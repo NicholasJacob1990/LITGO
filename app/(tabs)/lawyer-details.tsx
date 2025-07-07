@@ -10,19 +10,55 @@ import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LawyerService, Lawyer } from '@/lib/supabase';
 import { getOrCreatePreHiringChat } from '@/lib/services/chat';
+import RadarChart from '@/components/organisms/RadarChart';
+import EducationSection from '@/components/molecules/EducationSection';
+import PublicationsSection from '@/components/molecules/PublicationsSection';
+import { Match } from '@/lib/services/api';
+
+const SuccessStatusBadge: React.FC<{ status?: string }> = ({ status }) => {
+  if (!status || status === 'N') {
+    return null;
+  }
+
+  const statusMap = {
+    V: { label: 'Êxito Verificado', color: '#10B981', icon: <CheckCircle size={14} color="#FFFFFF" /> },
+    P: { label: 'Êxito Autodeclarado', color: '#F59E0B', icon: <TrendingUp size={14} color="#FFFFFF" /> },
+  };
+
+  const currentStatus = statusMap[status as keyof typeof statusMap];
+  if (!currentStatus) return null;
+
+  return (
+    <View style={[styles.badgeBase, { backgroundColor: currentStatus.color }]}>
+      {currentStatus.icon}
+      <Text style={styles.badgeText}>{currentStatus.label}</Text>
+    </View>
+  );
+};
 
 export default function LawyerDetailsScreen() {
-  const { lawyerId } = useLocalSearchParams<{ lawyerId: string }>();
+  const { lawyerId, matchData: matchDataString } = useLocalSearchParams<{ lawyerId: string, matchData?: string }>();
   const [lawyer, setLawyer] = useState<Lawyer | null>(null);
+  const [matchData, setMatchData] = useState<Match | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [selectedConsultationType, setSelectedConsultationType] = useState<'chat' | 'video' | 'presential'>('chat');
+
+  const getYearsSince = (dateString?: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    return new Date().getFullYear() - date.getFullYear();
+  };
 
   useEffect(() => {
     if (lawyerId) {
       loadLawyerDetails();
     }
-  }, [lawyerId]);
+    if (matchDataString) {
+      setMatchData(JSON.parse(matchDataString));
+    }
+  }, [lawyerId, matchDataString]);
 
   const loadLawyerDetails = async () => {
     try {
@@ -78,16 +114,17 @@ export default function LawyerDetailsScreen() {
         { 
           text: 'Continuar', 
           onPress: () => {
-            // Navegar para tela de pagamento
-            router.push({
-              pathname: '/(tabs)/payment',
-              params: { 
-                lawyerId: lawyer.id,
-                lawyerName: lawyer.name,
-                consultationType: selectedConsultationType,
-                consultationFee: lawyer.consultation_fee.toString()
-              }
-            });
+            // Navegar para tela de pagamento - (T-future)
+            // router.push({
+            //   pathname: '/(tabs)/payment',
+            //   params: { 
+            //     lawyerId: lawyer.id,
+            //     lawyerName: lawyer.name,
+            //     consultationType: selectedConsultationType,
+            //     consultationFee: lawyer.consultation_fee.toString()
+            //   }
+            // });
+            Alert.alert("A ser implementado", "A tela de pagamento será implementada em um próximo sprint.");
           }
         }
       ]
@@ -170,10 +207,20 @@ export default function LawyerDetailsScreen() {
             <Text style={styles.metricValue}>{lawyer.experience}</Text>
             <Text style={styles.metricLabel}>Anos de Experiência</Text>
           </View>
+          {getYearsSince(lawyer.oab_inscription_date) !== null && (
+            <View style={styles.metricCard}>
+              <BookOpen size={24} color="#A0522D" />
+              <Text style={styles.metricValue}>{getYearsSince(lawyer.oab_inscription_date)}</Text>
+              <Text style={styles.metricLabel}>Anos de Inscrição</Text>
+            </View>
+          )}
           <View style={styles.metricCard}>
             <TrendingUp size={24} color="#1E40AF" />
             <Text style={styles.metricValue}>{lawyer.success_rate}%</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
             <Text style={styles.metricLabel}>Taxa de Sucesso</Text>
+                <SuccessStatusBadge status={lawyer.success_status} />
+            </View>
           </View>
           <View style={styles.metricCard}>
             <Clock size={24} color="#F59E0B" />
@@ -181,6 +228,13 @@ export default function LawyerDetailsScreen() {
             <Text style={styles.metricLabel}>Tempo Resposta</Text>
           </View>
         </View>
+
+        {matchData?.breakdown && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Análise de Compatibilidade</Text>
+            <RadarChart data={matchData.breakdown as any} size={300} />
+          </View>
+        )}
 
         {/* Especialidades */}
         <View style={styles.section}>
@@ -207,12 +261,19 @@ export default function LawyerDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre</Text>
           <Text style={styles.bioText}>
-            Advogado especializado em {lawyer.primary_area.toLowerCase()} com {lawyer.experience} anos de experiência. 
-            Formado em Direito pela Universidade de São Paulo, com pós-graduação em sua área de especialização. 
-            Atua principalmente com consultoria jurídica e representação em processos judiciais, 
-            sempre priorizando o melhor resultado para seus clientes.
+            {lawyer.bio || `Advogado especializado em ${lawyer.primary_area.toLowerCase()} com ${lawyer.experience} anos de experiência.`}
           </Text>
         </View>
+
+        {/* Integração dos novos componentes */}
+        <EducationSection 
+          education={typeof lawyer.education === 'string' ? JSON.parse(lawyer.education) : lawyer.education} 
+          experience={typeof lawyer.professional_experience === 'string' ? JSON.parse(lawyer.professional_experience) : lawyer.professional_experience}
+        />
+        <PublicationsSection 
+          publications={lawyer.publications || []} 
+          certifications={lawyer.certifications || []} 
+        />
 
         {/* Tipos de Consulta */}
         <View style={styles.section}>
@@ -475,6 +536,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  badgeBase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    marginLeft: 4,
   },
   section: {
     backgroundColor: '#FFFFFF',

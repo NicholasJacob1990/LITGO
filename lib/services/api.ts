@@ -1,12 +1,9 @@
 import Constants from 'expo-constants';
-import supabase from '../supabase'; // Importar o cliente supabase
+import supabase from '../supabase';
 
 // A URL da API é pega das variáveis de ambiente do Expo
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+export const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
-/**
- * Função auxiliar para obter os cabeçalhos de autenticação.
- */
 export async function getAuthHeaders() {
     const { data: { session } } = await supabase.auth.getSession();
     const headers: { [key: string]: string } = {
@@ -18,166 +15,289 @@ export async function getAuthHeaders() {
     return headers;
 }
 
+class AuthError extends Error {
+  constructor(message = 'Sessão inválida. Por favor, faça login novamente.') {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+/**
+ * Wrapper centralizado para todas as chamadas fetch à API.
+ * Lida com autenticação, tratamento de erros e expiração de token.
+ */
+async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` }),
+    ...options.headers,
+  };
+
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+    if (response.status === 401) {
+      // Token inválido ou expirado. Deslogar o usuário.
+      await supabase.auth.signOut();
+      // O listener onAuthStateChange no _layout principal irá redirecionar para o login.
+      throw new AuthError();
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(errorData.detail || `Erro na API: ${response.status}`);
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+    
+    return response.json();
+
+  } catch (error) {
+    if (error instanceof AuthError) {
+      throw error;
+    }
+    console.error(`Erro na chamada da API para ${endpoint}:`, error);
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
+  }
+}
+
+// Interfaces
 interface TriageTaskResponse {
     task_id: string;
     status: string;
     message: string;
 }
 
-/**
- * Representa o payload para criar um novo caso, espelhando o DTO do backend.
- */
-interface CasePayload {
-    texto_cliente: string;
-    area: string;
-    subarea: string;
-    urgency_h: number;
-    summary_embedding: number[];
-    coords: [number, number];
-}
-
-/**
- * Representa a estrutura de um advogado retornado pelo endpoint de match.
- */
-export interface Match {
-    lawyer_id: string;
+export interface LawyerMatch {
+    id: string;
     nome: string;
-    fair: number;
-    equity: number;
-    features: { [key: string]: number };
+    expertise_areas: string[];
+    score: number;
+    distance_km: number;
+    estimated_response_time_hours: number;
+    rating: number;
+    total_cases: number;
+    estimated_success_rate: number;
+    oab_numero?: string;
+    uf?: string;
     avatar_url?: string;
+    review_texts: string[];
     is_available: boolean;
-    primary_area: string;
-    rating?: number;
-    distance_km?: number;
+    review_count?: number;
+    experience?: number;
+    consultation_types?: ('chat' | 'video' | 'presential')[];
+    consultation_fee?: number;
+    curriculo_json?: any;
 }
 
-/**
- * Representa o payload para criar um novo caso, espelhando o DTO do backend.
- */
+export interface MatchResponse {
+    success: boolean;
+    case_id: string;
+    lawyers: LawyerMatch[];
+    total_lawyers_evaluated: number;
+    algorithm_version: string;
+    preset_used: string;
+    execution_time_ms: number;
+    weights_used: { [key: string]: number };
+    case_complexity: 'LOW' | 'MEDIUM' | 'HIGH';
+    ab_test_group?: string;
+    model_version_used?: string;
+}
+
+interface MatchRequest {
+    case: any;
+    top_n: number;
+    preset: 'fast' | 'expert' | 'balanced' | 'economic';
+    max_consultation_fee?: number;
+    max_hourly_rate?: number;
+    tiers?: string[];
+}
+
 interface TriagePayload {
     texto_cliente: string;
     coords?: [number, number];
 }
 
-/**
- * Envia os dados de um novo caso para o backend para iniciar a triagem.
- * A triagem é processada de forma assíncrona.
- *
- * @param payload - Os dados do caso a serem criados.
- * @returns Um objeto com o ID da tarefa de triagem.
- */
-export async function startTriage(payload: TriagePayload): Promise<TriageTaskResponse> {
-    try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/triage`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload),
-        });
+// Funções da API
+export function findMatches(request: MatchRequest): Promise<MatchResponse> {
+    return apiFetch('/match', {
+        method: 'POST',
+        body: JSON.stringify(request),
+    });
+}
 
-        if (response.status === 401) {
-            // TODO: Tratar o caso de token expirado (ex: redirecionar para login)
-            throw new Error('Não autorizado. Faça login novamente.');
-        }
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Falha ao iniciar a triagem.');
-        }
+export function startTriage(payload: TriagePayload): Promise<TriageTaskResponse> {
+    return apiFetch('/triage', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
 
-        return await response.json();
-    } catch (error) {
-        console.error('Erro em startTriage:', error);
-        throw error;
+export function getExplanation(caseId: string, lawyerIds: string[]): Promise<any> {
+    return apiFetch('/explain', {
+        method: 'POST',
+        body: JSON.stringify({ case_id: caseId, lawyer_ids: lawyerIds }),
+    });
+}
+
+export async function getCasesWithMatches(): Promise<any[]> {
+    const { data, error } = await supabase.rpc('get_cases_with_matches_count');
+    if (error) {
+        console.error('Error fetching cases with matches:', error);
+        throw new Error('Falha ao buscar casos com recomendações.');
     }
+    return data || [];
+}
+
+export function getPersistedMatches(caseId: string): Promise<MatchResponse> {
+    return apiFetch(`/cases/${caseId}/matches`, { method: 'GET' });
+}
+
+export interface LawyerKPIs {
+  kpi: {
+    success_rate: number;
+    cv_score: number;
+    [key: string]: any;
+  };
+  kpi_subarea: { [key: string]: number };
+  kpi_softskill: number;
+}
+
+export async function getLawyerPerformance(): Promise<LawyerKPIs> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new AuthError("Usuário não autenticado");
+
+    const { data, error } = await supabase
+        .from('lawyers')
+        .select('kpi, kpi_subarea, kpi_softskill')
+        .eq('id', user.id)
+        .single();
+
+    if (error) {
+        console.error('Error fetching lawyer performance:', error);
+        throw new Error('Falha ao buscar dados de performance.');
+    }
+    return data as LawyerKPIs;
+}
+
+export interface ConversationResponse {
+  reply: string;
+}
+
+export function continueTriageConversation(history: { role: string; content: string }[]): Promise<ConversationResponse> {
+  return apiFetch('/triage/conversation', {
+    method: 'POST',
+    body: JSON.stringify({ history }),
+  });
+}
+
+export function getDetailedAnalysis(caseId: string): Promise<any> {
+  return apiFetch(`/cases/${caseId}/detailed-analysis`, {
+    method: 'GET',
+  });
+}
+
+export async function getPerformanceData(): Promise<any> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new AuthError("Usuário não autenticado");
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('kpi, kpi_subarea, kpi_softskill')
+    .eq('id', user.id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching performance data:', error);
+    throw new Error('Falha ao buscar dados de performance.');
+  }
+  return data;
+}
+
+export interface Review {
+  id: string;
+  contract_id: string;
+  lawyer_id: string;
+  client_id: string;
+  rating: number;
+  comment?: string;
+  outcome?: string;
+  communication_rating?: number;
+  expertise_rating?: number;
+  timeliness_rating?: number;
+  would_recommend?: boolean;
+  lawyer_response?: string;
+  lawyer_responded_at?: string;
+  response_edited_at?: string;
+  response_edit_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LawyerResponseCreate {
+  message: string;
+}
+
+export interface LawyerResponseUpdate {
+  message: string;
+}
+
+// === Matching v2 ===
+
+export type Preset = 'balanced' | 'fast' | 'expert' | 'economic';
+
+export interface Match {
+  lawyer_id: string;
+  nome: string;
+  avatar_url?: string;
+  is_available: boolean;
+  primary_area: string;
+  rating?: number;
+  distance_km?: number;
+  // Pontuações/opcionais
+  fair?: number;
+  equity?: number;
+  features?: Record<string, any>;
+}
+
+export interface MatchResponseAPI {
+  case_id: string;
+  matches: Match[];
 }
 
 /**
- * Envia os dados de um novo caso para o backend.
- *
- * @param payload - Os dados do caso a serem criados.
- * @returns O ID do caso criado.
+ * Obtém recomendações de advogados para um determinado caso já criado.
+ * Encaminha para o endpoint `/match` do backend, que aceita diversos ajustes finos.
  */
-export async function createCase(payload: CasePayload): Promise<{ case_id: string }> {
-    try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/cases`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload),
-        });
+export function getMatchesForCase(
+  caseId: string,
+  preset: Preset = 'balanced',
+  k: number = 5,
+  options?: {
+    exclude_ids?: string[];
+    area?: string;
+    subarea?: string;
+    radius_km?: number;
+  },
+): Promise<MatchResponseAPI> {
+  const payload: Record<string, any> = { case_id: caseId, k, preset };
+  if (options?.exclude_ids?.length) payload.exclude_ids = options.exclude_ids;
+  if (options?.area) payload.area = options.area;
+  if (options?.subarea) payload.subarea = options.subarea;
+  if (options?.radius_km) payload.radius_km = options.radius_km;
 
-        if (response.status === 401) {
-            // TODO: Tratar o caso de token expirado (ex: redirecionar para login)
-            throw new Error('Não autorizado. Faça login novamente.');
-        }
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Falha ao criar o caso.');
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Erro em createCase:', error);
-        throw error;
-    }
+  return apiFetch('/match', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
-/**
- * Solicita ao backend uma lista de advogados compatíveis para um caso.
- *
- * @param caseId - O ID do caso para o qual encontrar matches.
- * @param k - O número de matches a serem retornados (opcional).
- * @returns Uma lista de advogados.
- */
-export async function getMatches(caseId: string, k: number = 5): Promise<Match[]> {
-    try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/match`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ case_id: caseId, k }),
-        });
+// Reexporta para facilitar importação em outras partes do app
+export type { Match as MatchResult };
 
-        if (response.status === 401) {
-            throw new Error('Não autorizado. Faça login novamente.');
-        }
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Falha ao buscar matches.');
-        }
-
-        const data = await response.json();
-        return data.matches;
-    } catch (error) {
-        console.error('Erro em getMatches:', error);
-        throw error;
-    }
-}
-
-interface ExplainResponse {
-    explanations: { [key: string]: string };
-}
-
-/**
- * Solicita uma explicação para um ou mais matches de advogados.
- */
-export async function getExplanation(caseId: string, lawyerIds: string[]): Promise<ExplainResponse> {
-    try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/explain`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ case_id: caseId, lawyer_ids: lawyerIds }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Falha ao buscar explicações.');
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Erro em getExplanation:', error);
-        throw error;
-    }
-} 
+// Exporta tipo Match diretamente
+export type { Match }; 

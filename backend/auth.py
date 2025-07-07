@@ -1,10 +1,12 @@
 # backend/auth.py
 import os
+
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from supabase import create_client, Client
 from gotrue.errors import AuthApiError
-from dotenv import load_dotenv
+
+from supabase import Client, create_client
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -12,7 +14,8 @@ load_dotenv()
 # --- Configuração ---
 # Estas variáveis são necessárias para que o cliente Supabase possa verificar o token.
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("EXPO_PUBLIC_SUPABASE_ANON_KEY") # Usando a chave anônima pública
+# Usando a chave anônima pública
+SUPABASE_ANON_KEY = os.getenv("EXPO_PUBLIC_SUPABASE_ANON_KEY")
 
 # Em um ambiente de teste, usamos valores falsos para evitar erros de inicialização.
 IS_TESTING = os.getenv("TESTING") == "true"
@@ -21,7 +24,8 @@ if IS_TESTING:
     SUPABASE_ANON_KEY = "test-anon-key"
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    raise ValueError("Variáveis de ambiente do Supabase (URL e Chave Anônima) não configuradas para autenticação.")
+    raise ValueError(
+        "Variáveis de ambiente do Supabase (URL e Chave Anônima) não configuradas para autenticação.")
 
 # Cliente Supabase usando a chave anônima para validação do token.
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -30,6 +34,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # --- Dependência de Autenticação ---
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     """
     Dependência do FastAPI para validar o token JWT e obter os dados do usuário.
@@ -38,7 +44,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if IS_TESTING:
         # Em modo de teste, pulamos a validação e retornamos um usuário mock.
         return {"id": "test-user-id", "role": "authenticated"}
-    
+
     try:
         # A biblioteca do Supabase valida o token e retorna os dados do usuário.
         user_response = supabase.auth.get_user(token)
@@ -56,4 +62,4 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Não foi possível validar as credenciais",
             headers={"WWW-Authenticate": "Bearer"},
-        ) 
+        )

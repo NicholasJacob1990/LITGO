@@ -82,8 +82,10 @@ export default function ChatListScreen() {
     if (chat.type === 'pre-hiring') {
       router.push(`/pre-hiring-chat/${chat.id}`);
     } else {
-      // Para casos, usar React Navigation
-      navigation.navigate('CaseChat', { caseId: chat.id });
+      router.push({
+        pathname: '/(tabs)/cases/CaseChat',
+        params: { caseId: chat.id },
+      });
     }
   };
 

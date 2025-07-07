@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import supabase from '../supabase';
-import { isEqual } from 'lodash';
 
 type UserRole = 'client' | 'lawyer' | null;
 
@@ -10,6 +9,7 @@ interface AuthContextType {
   session: Session | null;
   role: UserRole;
   isLoading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,7 +17,16 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   role: null,
   isLoading: true,
+  signOut: async () => {},
 });
+
+// Função simples para comparar objetos sem lodash
+const isEqual = (obj1: any, obj2: any): boolean => {
+  if (obj1 === obj2) return true;
+  if (obj1 === null || obj2 === null) return false;
+  if (obj1 === undefined || obj2 === undefined) return false;
+  return JSON.stringify(obj1) === JSON.stringify(obj2);
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,16 +36,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const getInitialSession = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      setRole(initialSession?.user?.user_metadata?.role || null);
-      setIsLoading(false);
+      try {
+        console.log('AuthProvider: Iniciando verificação de sessão...');
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('AuthProvider: Erro ao obter sessão:', error);
+        } else {
+          console.log('AuthProvider: Sessão obtida:', initialSession ? 'Usuário logado' : 'Nenhum usuário');
+        }
+        
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        setRole(initialSession?.user?.user_metadata?.role || null);
+        console.log('AuthProvider: Estado inicial definido, isLoading = false');
+        setIsLoading(false);
+      } catch (error) {
+        console.error('AuthProvider: Erro na verificação de sessão:', error);
+        // Mesmo com erro, definir isLoading como false para não travar o app
+        setIsLoading(false);
+      }
     };
 
-    getInitialSession();
+    // Timeout de segurança para garantir que o loading seja resolvido
+    const timeoutId = setTimeout(() => {
+      console.log('AuthProvider: Timeout atingido, forçando isLoading = false');
+      setIsLoading(false);
+    }, 5000); // 5 segundos
+
+    getInitialSession().finally(() => {
+      clearTimeout(timeoutId);
+    });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      console.log('AuthProvider: Mudança de estado de auth:', _event);
       setSession(prevSession => {
         if (!isEqual(prevSession, newSession)) {
           return newSession;
@@ -53,16 +86,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => {
+      clearTimeout(timeoutId);
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const value = useMemo(() => ({
     user,
     session,
     role,
-    isLoading
+    isLoading,
+    signOut,
   }), [user, session, role, isLoading]);
+
+  console.log('AuthProvider: Renderizando com isLoading =', isLoading);
 
   return (
     <AuthContext.Provider value={value}>

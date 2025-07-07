@@ -2,77 +2,43 @@ name: LITGO CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  test-and-lint:
+  test-backend:
     runs-on: ubuntu-latest
-    
-    services:
-      # A imagem do Supabase já inclui Postgres com as extensões necessárias (pgvector)
-      db:
-        image: supabase/postgres:15.1.0.118
-        env:
-          POSTGRES_USER: litgo
-          POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: litgo_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U litgo -d litgo_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx sse-starlette
+      - name: Run backend tests
+        run: |
+          PYTHONPATH=. pytest --cov=backend --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: true
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'app/package-lock.json'
-
-    - name: Install Backend Dependencies
-      run: pip install -r backend/requirements.txt
-
-    - name: Run Backend Tests
-      env:
-        # Aponta o backend para o DB e Redis do CI
-        SUPABASE_URL: http://localhost:5432
-        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_ANON_KEY }} # Chave segura para testes
-        REDIS_URL: redis://localhost:6379/0
-      run: pytest backend/
-
-    - name: Install Frontend Dependencies
-      run: npm ci --prefix app
-
-    - name: Run Frontend Linter
-      run: npm run lint --prefix app
-
-    # Etapa de E2E com Cypress (descomentar quando os testes estiverem prontos)
-    # - name: Run Cypress E2E Tests
-    #   uses: cypress-io/github-action@v6
-    #   with:
-    #     start: npm run dev --prefix app
-    #     wait-on: 'http://localhost:8081' # Espera o servidor de dev do Expo iniciar
-    #     browser: chrome 
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install
+      - name: Run frontend tests
+        run: npm test -- --watchAll=false

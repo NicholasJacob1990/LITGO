@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { Plus, FileText, Download, Trash2, Upload, Eye } from 'lucide-react-native';
+import { Plus, FileText, Download, Trash2, Eye } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { 
   getCaseDocuments, 
@@ -20,10 +20,8 @@ import {
   downloadDocument, 
   pickDocument,
   formatFileSize,
-  getFileIcon,
   isValidFileType,
   DocumentData,
-  DocumentUploadData
 } from '@/lib/services/documents';
 import TopBar from '@/components/layout/TopBar';
 import Badge from '@/components/atoms/Badge';
@@ -31,7 +29,6 @@ import Avatar from '@/components/atoms/Avatar';
 
 export default function CaseDocuments() {
   const route = useRoute<any>();
-  const navigation = useNavigation();
   const { user } = useAuth();
   const { caseId } = route.params;
 
@@ -40,11 +37,8 @@ export default function CaseDocuments() {
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    loadDocuments();
-  }, [caseId]);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
+    if (!caseId) return;
     try {
       setLoading(true);
       const docs = await getCaseDocuments(caseId);
@@ -55,7 +49,11 @@ export default function CaseDocuments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [caseId]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -66,10 +64,7 @@ export default function CaseDocuments() {
   const handleUploadDocument = async () => {
     try {
       const result = await pickDocument();
-      
-      if (result.type === 'cancel') {
-        return;
-      }
+      if (result.canceled) return;
 
       const doc = result.assets?.[0];
       if (!doc) {
@@ -77,40 +72,27 @@ export default function CaseDocuments() {
         return;
       }
 
-      // Validar tipo de arquivo
-      const fileExtension = doc.name.split('.').pop() || '';
+      const fileExtension = doc.name.split('.').pop()?.toLowerCase() || '';
       if (!isValidFileType(fileExtension)) {
-        Alert.alert(
-          'Tipo de arquivo não suportado',
-          'Por favor, selecione um arquivo PDF, DOC, DOCX, JPG, PNG, TXT, XLS, PPT ou similar.'
-        );
+        Alert.alert('Tipo de arquivo não suportado', 'Por favor, selecione um arquivo válido (PDF, DOCX, PNG, JPG, etc.).');
         return;
       }
 
-      // Validar tamanho (max 10MB)
       if (doc.size && doc.size > 10 * 1024 * 1024) {
-        Alert.alert(
-          'Arquivo muito grande',
-          'O arquivo deve ter no máximo 10MB.'
-        );
+        Alert.alert('Arquivo muito grande', 'O arquivo deve ter no máximo 10MB.');
         return;
       }
 
       setUploading(true);
-
-      // Preparar dados do documento
-      const documentData: DocumentUploadData = {
+      
+      const uploadedDoc = await uploadDocument(caseId, user?.id || '', {
+        uri: doc.uri,
         name: doc.name,
-        file: doc.file as File,
-        category: 'other'
-      };
-
-      // Fazer upload
-      const uploadedDoc = await uploadDocument(caseId, user?.id || '', documentData);
+        type: doc.mimeType || 'application/octet-stream',
+        size: doc.size,
+      });
       
-      // Atualizar lista
-      setDocuments(prev => [uploadedDoc, ...prev]);
-      
+      setDocuments((prev: DocumentData[]) => [uploadedDoc, ...prev]);
       Alert.alert('Sucesso', 'Documento enviado com sucesso!');
     } catch (error) {
       console.error('Error uploading document:', error);
@@ -120,7 +102,7 @@ export default function CaseDocuments() {
     }
   };
 
-  const handleDeleteDocument = async (documentId: string, documentName: string) => {
+  const handleDeleteDocument = (documentId: string, documentName: string) => {
     Alert.alert(
       'Confirmar exclusão',
       `Tem certeza que deseja excluir "${documentName}"?`,
@@ -132,7 +114,7 @@ export default function CaseDocuments() {
           onPress: async () => {
             try {
               await deleteDocument(documentId);
-              setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+              setDocuments((prev: DocumentData[]) => prev.filter(doc => doc.id !== documentId));
               Alert.alert('Sucesso', 'Documento excluído com sucesso!');
             } catch (error) {
               console.error('Error deleting document:', error);
@@ -144,16 +126,14 @@ export default function CaseDocuments() {
     );
   };
 
-  const handleDownloadDocument = async (documentId: string, documentName: string) => {
+  const handleDownloadDocument = async (documentId: string) => {
     try {
-      const fileUri = await downloadDocument(documentId);
-      Alert.alert(
-        'Download concluído',
-        `Documento "${documentName}" baixado com sucesso!`,
-        [
-          { text: 'OK' }
-        ]
-      );
+      const success = await downloadDocument(documentId);
+      if (success) {
+        Alert.alert('Sucesso', 'Documento salvo em seus Downloads.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível baixar o documento.');
+      }
     } catch (error) {
       console.error('Error downloading document:', error);
       Alert.alert('Erro', 'Não foi possível baixar o documento');
@@ -168,9 +148,9 @@ export default function CaseDocuments() {
             <FileText size={20} color="#006CFF" />
           </View>
           <View style={styles.documentDetails}>
-            <Text style={styles.documentName}>{doc.name}</Text>
+            <Text style={styles.documentName} numberOfLines={1}>{doc.name}</Text>
             <View style={styles.documentMeta}>
-              <Text style={styles.documentSize}>{formatFileSize(doc.file_size)}</Text>
+              <Text style={styles.documentSize}>{formatFileSize(doc.file_size || 0)}</Text>
               <Text style={styles.documentSeparator}>•</Text>
               <Text style={styles.documentDate}>
                 {new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}
@@ -179,48 +159,29 @@ export default function CaseDocuments() {
             {doc.uploader && (
               <View style={styles.uploaderInfo}>
                 <Avatar 
-                  src={doc.uploader.avatar} 
-                  name={doc.uploader.name} 
-                  size="small" 
+                  src={(doc.uploader as any).avatar_url} 
+                  name={(doc.uploader as any).full_name} 
+                  size="xsmall" 
                 />
                 <Text style={styles.uploaderName}>
-                  Enviado por {doc.uploader.name}
+                  {(doc.uploader as any).full_name}
                 </Text>
               </View>
             )}
           </View>
         </View>
-        {doc.category && (
-          <Badge 
-            label={doc.category === 'contract' ? 'Contrato' : 
-                  doc.category === 'evidence' ? 'Evidência' : 
-                  doc.category === 'identification' ? 'Identificação' : 'Outro'}
-            intent="neutral"
-            size="small"
-          />
-        )}
       </View>
-
-      {doc.description && (
-        <Text style={styles.documentDescription}>{doc.description}</Text>
-      )}
 
       <View style={styles.documentActions}>
         <TouchableOpacity 
           style={styles.actionButton}
-          onPress={() => handleDownloadDocument(doc.id, doc.name)}
+          onPress={() => handleDownloadDocument(doc.id)}
         >
           <Download size={16} color="#006CFF" />
           <Text style={styles.actionButtonText}>Baixar</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => {
-            // Implementar visualização do documento
-            console.log('View document:', doc.id);
-          }}
-        >
+        <TouchableOpacity style={styles.actionButton}>
           <Eye size={16} color="#006CFF" />
           <Text style={styles.actionButtonText}>Visualizar</Text>
         </TouchableOpacity>
@@ -238,25 +199,10 @@ export default function CaseDocuments() {
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <TopBar title="Documentos" showBack />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#006CFF" />
-          <Text style={styles.loadingText}>Carregando documentos...</Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
       <TopBar title="Documentos" showBack />
-
       <ScrollView 
         style={styles.content}
         refreshControl={
@@ -264,48 +210,28 @@ export default function CaseDocuments() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Upload Section */}
         <View style={styles.uploadSection}>
           <TouchableOpacity 
             style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
             onPress={handleUploadDocument}
             disabled={uploading}
           >
-            {uploading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Plus size={20} color="#FFFFFF" />
-            )}
+            {uploading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Plus size={20} color="#FFFFFF" />}
             <Text style={styles.uploadButtonText}>
               {uploading ? 'Enviando...' : 'Adicionar Documento'}
             </Text>
           </TouchableOpacity>
-          
-          <Text style={styles.uploadHint}>
-            Formatos suportados: PDF, DOC, DOCX, JPG, PNG, TXT, XLS, PPT
-          </Text>
-          <Text style={styles.uploadHint}>
-            Tamanho máximo: 10MB
-          </Text>
         </View>
 
-        {/* Documents List */}
         <View style={styles.documentsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Documentos</Text>
-            <Badge 
-              label={documents.length.toString()} 
-              intent="neutral" 
-              size="small" 
-            />
-          </View>
-
-          {documents.length === 0 ? (
+          {loading ? (
+             <ActivityIndicator size="large" color="#006CFF" style={{marginTop: 40}}/>
+          ): documents.length === 0 ? (
             <View style={styles.emptyState}>
               <FileText size={48} color="#9CA3AF" />
               <Text style={styles.emptyStateTitle}>Nenhum documento</Text>
               <Text style={styles.emptyStateDescription}>
-                Adicione documentos relacionados ao seu caso para facilitar o atendimento jurídico.
+                Adicione documentos relacionados ao seu caso para facilitar o atendimento.
               </Text>
             </View>
           ) : (
@@ -359,26 +285,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
   },
-  uploadHint: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 8,
-  },
   documentsSection: {
     marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: '#1F2937',
   },
   documentCard: {
     backgroundColor: '#FFFFFF',
@@ -444,18 +352,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 4,
   },
   uploaderName: {
     fontFamily: 'Inter-Regular',
     fontSize: 12,
     color: '#6B7280',
-  },
-  documentDescription: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#4B5563',
-    marginBottom: 16,
-    lineHeight: 20,
   },
   documentActions: {
     flexDirection: 'row',

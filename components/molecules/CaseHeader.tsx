@@ -1,56 +1,38 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Badge from '../atoms/Badge';
 
-interface CaseHeaderProps {
-  title: string;
-  subtitle?: string;
-  variant?: 'default' | 'detailed';
-}
+export default function CaseHeader({
+  titulo,
+  urgencia,
+  status,
+}: {
+  titulo: string;
+  urgencia: 'alta' | 'media' | 'baixa';
+  status: string;
+}) {
+  const urgMap = { alta: 'danger', media: 'warning', baixa: 'success' } as const;
 
-export default function CaseHeader({ title, subtitle, variant = 'default' }: CaseHeaderProps) {
   return (
-    <View style={styles.container}>
-      <Text style={[
-        styles.title,
-        variant === 'detailed' && styles.titleDetailed
-      ]}>
-        {title}
-      </Text>
-      {subtitle && (
-        <Text style={[
-          styles.subtitle,
-          variant === 'detailed' && styles.subtitleDetailed
-        ]}>
-          {subtitle}
-        </Text>
-      )}
+    <View style={styles.wrapper}>
+      <Text style={styles.title}>{titulo}</Text>
+
+      <View style={styles.badges}>
+        <Badge label={urgencia.toUpperCase()} intent={urgMap[urgencia]} outline />
+        <Badge label={status} intent="warning" />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 8,
-  },
+  wrapper: { marginBottom: 12 },
   title: {
-    fontFamily: 'Inter-SemiBold',
     fontSize: 18,
-    color: '#1F2937',
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
     lineHeight: 24,
   },
-  titleDetailed: {
-    fontSize: 22,
-    lineHeight: 28,
-  },
-  subtitle: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginTop: 4,
-  },
-  subtitleDetailed: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
+  badges: { flexDirection: 'row', gap: 8 },
 }); 

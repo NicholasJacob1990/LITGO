@@ -10,6 +10,7 @@ Programação sugerida: 03:30 UTC depois do Jusbrasil.
 import json
 import logging
 from pathlib import Path
+
 import pandas as pd
 
 AUDIT_FILE = Path("logs/audit.log")
@@ -66,4 +67,4 @@ def build_dataset():
 
 
 if __name__ == "__main__":
-    build_dataset() 
+    build_dataset()

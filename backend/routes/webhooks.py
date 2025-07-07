@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """Webhooks – recebe eventos externos (DocuSign, etc.)."""
-from fastapi import APIRouter, HTTPException, status, Request
-from supabase import create_client
+from fastapi import APIRouter, HTTPException, Request, status
+
 from backend.config import settings
+from supabase import create_client
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
 
 @router.post("/docusign", status_code=status.HTTP_204_NO_CONTENT)
 async def docusign_webhook(req: Request):
@@ -36,6 +38,7 @@ async def docusign_webhook(req: Request):
     }.get(status_event.lower(), "pending-signature")
 
     try:
-        supabase.table("contracts").update({"status": new_status}).eq("id", contract_id).execute()
+        supabase.table("contracts").update(
+            {"status": new_status}).eq("id", contract_id).execute()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))

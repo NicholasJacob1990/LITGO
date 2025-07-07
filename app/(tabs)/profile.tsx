@@ -1,11 +1,12 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
 import { useState } from 'react';
-import { User, Settings, Bell, Shield, CreditCard, Star, FileText, LogOut, ChevronRight, CreditCard as Edit3, Building2, Scale } from 'lucide-react-native';
+import { User, Settings, Bell, Shield, CreditCard, Star, FileText, LogOut, ChevronRight, Edit3 as EditIcon, Building2, Scale, BarChart2, CheckSquare } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
-export default function ProfileScreen() {
+const ClientProfileScreen = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [userType] = useState<'PF' | 'PJ'>('PF'); // This would come from user data
 
@@ -29,8 +30,16 @@ export default function ProfileScreen() {
       id: 'edit-profile',
       title: 'Editar Perfil',
       subtitle: userType === 'PF' ? 'Atualize suas informações pessoais' : 'Atualize dados da empresa',
-      icon: Edit3,
+      icon: EditIcon,
       color: '#1E40AF',
+    },
+    {
+      id: 'contracts',
+      title: 'Meus Contratos',
+      subtitle: 'Visualize e gerencie seus contratos',
+      icon: CheckSquare,
+      color: '#059669',
+      href: '/(tabs)/contracts',
     },
     {
       id: 'payment-methods',
@@ -99,7 +108,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarContainer}>
             <Image source={{ uri: user.avatar }} style={styles.avatar} />
             <TouchableOpacity style={styles.editAvatarButton}>
-              <Edit3 size={16} color="#FFFFFF" />
+              <EditIcon size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           
@@ -192,6 +201,26 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Configurações</Text>
           
           {menuItems.map((item) => {
+            // Se for item com href, usar Link
+            if (item.href) {
+              return (
+                <Link href={item.href as any} asChild key={item.id}>
+                  <TouchableOpacity style={styles.menuItem}>
+                    <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
+                      <item.icon size={20} color={item.color} />
+                    </View>
+                    
+                    <View style={styles.menuContent}>
+                      <Text style={styles.menuTitle}>{item.title}</Text>
+                      <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                    </View>
+                    
+                    <ChevronRight size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </Link>
+              );
+            }
+            
             // Se for o item de configurações, usar Link, caso contrário TouchableOpacity
             if (item.id === 'settings') {
               return (
@@ -245,6 +274,114 @@ export default function ProfileScreen() {
       </ScrollView>
     </View>
   );
+}
+
+const LawyerProfileScreen = () => {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
+  const lawyerMenuItems = [
+    {
+      id: 'performance-dashboard',
+      title: 'Meu Desempenho',
+      subtitle: 'Visualize suas métricas e KPIs',
+      icon: BarChart2,
+      color: '#1E40AF',
+      onPress: () => router.push('/(tabs)/profile/performance'),
+    },
+    {
+      id: 'my-reviews',
+      title: 'Minhas Avaliações',
+      subtitle: 'Gerencie e responda às avaliações dos clientes',
+      icon: Star,
+      color: '#F59E0B',
+      onPress: () => router.push('/(tabs)/profile/my-reviews'),
+    },
+    {
+      id: 'platform-documents',
+      title: 'Documentos da Plataforma',
+      subtitle: 'Contratos, políticas e termos de uso',
+      icon: FileText,
+      color: '#059669',
+      onPress: () => router.push('/(tabs)/profile/platform-documents'),
+    },
+    {
+      id: 'availability-settings',
+      title: 'Configurações de Disponibilidade',
+      subtitle: 'Gerencie sua disponibilidade e limites de casos',
+      icon: CheckSquare,
+      color: '#10B981',
+      onPress: () => router.push('/(tabs)/profile/availability-settings'),
+    },
+    {
+      id: 'profile-settings',
+      title: 'Configurações do Perfil',
+      subtitle: 'Edite seu perfil público e dados de diversidade',
+      icon: EditIcon,
+      color: '#7C3AED',
+      onPress: () => router.push('/(tabs)/profile/edit-lawyer'),
+    },
+    {
+      id: 'account-settings',
+      title: 'Configurações da Conta',
+      subtitle: 'Preferências do aplicativo e segurança',
+      icon: Settings,
+      color: '#6B7280',
+      onPress: () => router.push('/(tabs)/settings'),
+    },
+  ];
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient colors={['#1F2937', '#4B5563']} style={styles.header}>
+        <View style={styles.profileSection}>
+          <Image source={{ uri: user?.user_metadata?.avatar_url || 'https://i.pravatar.cc/150' }} style={styles.avatar} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{user?.user_metadata?.full_name || 'Advogado(a)'}</Text>
+            <Text style={styles.userEmail}>{user?.email}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <ScrollView style={styles.content}>
+        {lawyerMenuItems.map((item) => (
+          <TouchableOpacity key={item.id} style={styles.menuItem} onPress={item.onPress}>
+            <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
+              <item.icon size={20} color={item.color} />
+            </View>
+            <View style={styles.menuContent}>
+              <Text style={styles.menuTitle}>{item.title}</Text>
+              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+            </View>
+            <ChevronRight size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+        ))}
+        
+        {/* Botão de Logout para Advogado */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+            <LogOut size={20} color="#EF4444" />
+            <Text style={styles.logoutText}>Sair da Conta</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
+export default function ProfileScreen() {
+  const { user } = useAuth();
+  
+  // Usar user?.user_metadata?.user_type que é definido no momento do cadastro
+  const userRole = user?.user_metadata?.user_type;
+
+  if (!user) {
+    // Tela de loading ou skeleton
+    return <View style={styles.container} />;
+  }
+  
+  // Renderiza a tela de perfil apropriada com base no papel do usuário
+  return userRole === 'LAWYER' ? <LawyerProfileScreen /> : <ClientProfileScreen />;
 }
 
 const styles = StyleSheet.create({

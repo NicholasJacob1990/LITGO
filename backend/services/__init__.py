@@ -6,16 +6,19 @@ Módulo de serviços - pasta para organização dos serviços específicos.
 # As importações devem ser feitas diretamente dos módulos específicos.
 
 from __future__ import annotations
+
+import os
+from typing import Dict, List
+
+from dotenv import load_dotenv
+
+from supabase import Client, create_client
+
 """Pacote de serviços – exporta utilitários de alto nível.
 Inclui generate_explanations_for_matches para evitar conflito entre
 arquivo services.py antigo e o pacote.
 """
 
-import os
-from typing import List, Dict
-
-from dotenv import load_dotenv
-from supabase import create_client, Client
 
 # Carregar variáveis de ambiente a partir do .env raiz
 load_dotenv()
@@ -23,14 +26,19 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-    raise RuntimeError("Variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY não configuradas.")
+    raise RuntimeError(
+        "Variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY não configuradas.")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # Importar serviço de explicação IA
-from .explanation_service import explanation_service  # noqa: E402
+from .explanation_service import (  # noqa: E402
+    generate_explanations_for_matches as explanation_service,
+)
 
-async def generate_explanations_for_matches(case_id: str, lawyer_ids: List[str]) -> Dict[str, str]:
+
+async def generate_explanations_for_matches(
+        case_id: str, lawyer_ids: List[str]) -> Dict[str, str]:
     """Gera explicações IA para uma lista de advogados de um caso."""
     # 1. Buscar resumo do caso
     case_row = (

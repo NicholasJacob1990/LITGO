@@ -13,11 +13,12 @@ interface TopBarProps {
   title: string;
   subtitle?: string;
   showBack?: boolean;
+  showShare?: boolean;
   rightActions?: ActionButtonProps[];
   onShare?: () => void;
 }
 
-export default function TopBar({ title, subtitle, showBack = false, rightActions, onShare }: TopBarProps) {
+export default function TopBar({ title, subtitle, showBack = false, showShare = false, rightActions, onShare }: TopBarProps) {
   const navigation = useNavigation();
 
   const handleBack = () => {
@@ -64,7 +65,7 @@ export default function TopBar({ title, subtitle, showBack = false, rightActions
                 </TouchableOpacity>
               );
             })}
-            {onShare && !rightActions && (
+            {(showShare || onShare) && !rightActions && (
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={onShare}

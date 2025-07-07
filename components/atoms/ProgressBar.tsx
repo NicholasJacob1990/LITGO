@@ -1,54 +1,51 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 
-interface ProgressBarProps {
-  value: number; // 0-10
-  maxValue?: number;
+type ProgressBarProps = {
+  progress?: number;
+  color?: string;
   height?: number;
-  backgroundColor?: string;
-  fillColor?: string;
-}
+  showPercentage?: boolean;
+};
 
-export default function ProgressBar({ 
-  value, 
-  maxValue = 10, 
-  height = 4, 
-  backgroundColor = '#E5E7EB',
-  fillColor 
+export default function ProgressBar({
+  progress = 0,
+  color = '#3B82F6',
+  height = 6,
+  showPercentage = false,
 }: ProgressBarProps) {
-  const percentage = Math.min(Math.max(value, 0), maxValue) / maxValue;
-  
-  const getProgressColor = () => {
-    if (fillColor) return fillColor;
-    
-    if (percentage >= 0.8) return '#E44C2E'; // danger
-    if (percentage >= 0.6) return '#F5A623'; // warning
-    if (percentage >= 0.4) return '#006CFF'; // primary
-    return '#1DB57C'; // success
-  };
+  const percentage = Math.min(100, Math.max(0, progress));
 
   return (
-    <View style={[styles.container, { height, backgroundColor }]}>
-      <View
-        style={[
-          styles.fill,
-          {
-            width: `${percentage * 100}%`,
-            height,
-            backgroundColor: getProgressColor(),
-          },
-        ]}
-      />
+    <View style={styles.container}>
+    <View style={[styles.track, { height }]}>
+      <View style={[styles.fill, { width: `${percentage}%`, backgroundColor: color }]} />
+      </View>
+      {showPercentage && (
+        <Text style={[styles.percentageText, { color: color }]}>{`${Math.round(percentage)}%`}</Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 2,
+    width: '100%',
+  },
+  track: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 8,
     overflow: 'hidden',
   },
   fill: {
-    borderRadius: 2,
+    height: '100%',
+    borderRadius: 8,
   },
-}); 
+  percentageText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 12,
+    position: 'absolute',
+    right: 0,
+    top: -18,
+  },
+});

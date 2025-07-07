@@ -11,16 +11,15 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Brain, CheckCircle, AlertTriangle, Calendar, DollarSign, Scale, FileText, Share } from 'lucide-react-native';
+import { Brain, CheckCircle, AlertTriangle, FileText, Share } from 'lucide-react-native';
 import { getCaseById, getAIAnalysis } from '@/lib/services/cases';
 import TopBar from '@/components/layout/TopBar';
 import Badge from '@/components/atoms/Badge';
 import ProgressBar from '@/components/atoms/ProgressBar';
-import StepItem from '@/components/molecules/StepItem';
 import CaseActions from '@/components/molecules/CaseActions';
 
 export default function AISummary() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
 
   const [caseData, setCaseData] = useState<any>(null);
@@ -56,23 +55,6 @@ export default function AISummary() {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  };
-
-  const handleScheduleConsult = () => {
-    Alert.alert(
-      'Agendar Consulta',
-      'Deseja agendar uma consulta com um advogado especializado?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Agendar',
-          onPress: () => {
-            // Navegar para tela de agendamento
-            navigation.navigate('ScheduleConsult', { caseId, analysis: aiAnalysis });
-          }
-        }
-      ]
-    );
   };
 
   const handleShare = () => {
@@ -142,8 +124,7 @@ export default function AISummary() {
         title="Resumo IA"
         subtitle={aiAnalysis.title || 'Análise do Caso'}
         showBack
-        showShare
-        onShare={handleShare}
+        rightActions={[{ icon: Share, onPress: handleShare }]}
       />
 
       <ScrollView
@@ -153,7 +134,6 @@ export default function AISummary() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerIcon}>
             <Brain size={24} color="#006CFF" />
@@ -171,7 +151,6 @@ export default function AISummary() {
           />
         </View>
 
-        {/* Confidence Score */}
         {aiAnalysis.confidence && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Nível de Confiança</Text>
@@ -189,54 +168,10 @@ export default function AISummary() {
           </View>
         )}
 
-        {/* Main Classification */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Classificação Principal</Text>
-          <View style={styles.classificationContainer}>
-            <View style={styles.classificationItem}>
-              <Scale size={20} color="#006CFF" />
-              <View style={styles.classificationInfo}>
-                <Text style={styles.classificationLabel}>Área Jurídica</Text>
-                <Text style={styles.classificationValue}>
-                  {aiAnalysis.legal_area || 'Não classificado'}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.classificationItem}>
-              <AlertTriangle size={20} color={getRiskColor(aiAnalysis.risk_level)} />
-              <View style={styles.classificationInfo}>
-                <Text style={styles.classificationLabel}>Nível de Risco</Text>
-                <Text style={styles.classificationValue}>
-                  {getRiskLabel(aiAnalysis.risk_level)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Cost Estimation */}
-        {aiAnalysis.estimated_cost && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Estimativa de Custos</Text>
-            <View style={styles.costContainer}>
-              <DollarSign size={20} color="#10B981" />
-              <Text style={styles.costValue}>
-                R$ {aiAnalysis.estimated_cost.toLocaleString('pt-BR')}
-              </Text>
-            </View>
-            <Text style={styles.costDescription}>
-              Estimativa baseada em casos similares
-            </Text>
-          </View>
-        )}
-
-        {/* Key Points */}
-        {aiAnalysis.key_points && (
-          <View style={styles.card}>
             <Text style={styles.cardTitle}>Pontos Principais</Text>
             <View style={styles.keyPointsList}>
-              {aiAnalysis.key_points.map((point: string, index: number) => (
+              {aiAnalysis.key_points?.map((point: string, index: number) => (
                 <View key={index} style={styles.keyPointItem}>
                   <CheckCircle size={16} color="#10B981" />
                   <Text style={styles.keyPointText}>{point}</Text>
@@ -244,29 +179,11 @@ export default function AISummary() {
               ))}
             </View>
           </View>
-        )}
 
-        {/* Recommendations */}
-        {aiAnalysis.recommendations && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Recomendações</Text>
-            <View style={styles.recommendationsList}>
-              {aiAnalysis.recommendations.map((rec: string, index: number) => (
-                <View key={index} style={styles.recommendationItem}>
-                  <View style={styles.recommendationBullet} />
-                  <Text style={styles.recommendationText}>{rec}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Next Steps */}
-        {aiAnalysis.next_steps && (
-          <View style={styles.card}>
+        <View style={styles.card}>
             <Text style={styles.cardTitle}>Próximos Passos</Text>
             <View style={styles.stepsList}>
-              {aiAnalysis.next_steps.map((step: string, index: number) => (
+              {aiAnalysis.next_steps?.map((step: string, index: number) => (
                 <View key={index} style={styles.stepItem}>
                   <View style={styles.stepNumber}>
                     <Text style={styles.stepNumberText}>{index + 1}</Text>
@@ -276,17 +193,22 @@ export default function AISummary() {
               ))}
             </View>
           </View>
-        )}
-
-        {/* Action Buttons */}
+        
         <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={() => navigation.navigate('DetailedAnalysis', { caseId })}
+          >
+            <Brain size={20} color="#FFFFFF" />
+            <Text style={styles.primaryButtonText}>Ver Análise Detalhada</Text>
+          </TouchableOpacity>
+          
           <CaseActions 
             onScheduleConsult={() => navigation.navigate('ScheduleConsult', { caseId, analysis: aiAnalysis })}
             onViewDocuments={() => navigation.navigate('CaseDocuments', { caseId })}
           />
         </View>
 
-        {/* Disclaimer */}
         <View style={styles.disclaimer}>
           <AlertTriangle size={16} color="#F59E0B" />
           <Text style={styles.disclaimerText}>
@@ -399,44 +321,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
   },
-  classificationContainer: {
-    gap: 16,
-  },
-  classificationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  classificationInfo: {
-    flex: 1,
-  },
-  classificationLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  classificationValue: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  costContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  costValue: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#10B981',
-  },
-  costDescription: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6B7280',
-  },
   keyPointsList: {
     gap: 12,
   },
@@ -446,28 +330,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   keyPointText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#1F2937',
-    flex: 1,
-    lineHeight: 22,
-  },
-  recommendationsList: {
-    gap: 12,
-  },
-  recommendationItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  recommendationBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#006CFF',
-    marginTop: 8,
-  },
-  recommendationText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#1F2937',
@@ -520,23 +382,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#FFFFFF',
-  },
-  secondaryButton: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#006CFF',
-  },
-  secondaryButtonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    color: '#006CFF',
   },
   disclaimer: {
     backgroundColor: '#FEF3C7',

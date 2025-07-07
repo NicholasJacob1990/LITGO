@@ -1,5 +1,6 @@
 # backend/explanation_service.py
 import os
+
 import anthropic
 from dotenv import load_dotenv
 
@@ -7,6 +8,7 @@ load_dotenv()
 
 # --- Configuração do Cliente Anthropic ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
 
 class ExplanationService:
     def __init__(self):
@@ -25,7 +27,7 @@ class ExplanationService:
 
         prompt = f"""
         Você é um assistente jurídico que ajuda clientes a entenderem por que um advogado é uma boa escolha para seu caso.
-        
+
         Resumo do Caso do Cliente:
         "{case_summary}"
 
@@ -41,7 +43,7 @@ class ExplanationService:
         Com base nos dados acima, escreva uma explicação curta (2-3 frases, em markdown) para o cliente, destacando os 2 ou 3 pontos mais fortes do advogado para este caso específico. Use uma linguagem clara e positiva.
         Exemplo: "Dr(a). [Nome] parece uma ótima opção! Com uma alta taxa de sucesso em casos como o seu e excelentes qualificações na área, ele(a) está bem preparado(a) para te ajudar. Além disso, seu escritório fica próximo a você."
         """
-        
+
         try:
             message = self.client.messages.create(
                 model="claude-3-haiku-20240307",
@@ -55,5 +57,6 @@ class ExplanationService:
             print(f"Erro ao gerar explicação com Claude: {e}")
             return "Houve um erro ao gerar a explicação. Tente novamente."
 
+
 # Instância única
-explanation_service = ExplanationService() 
+explanation_service = ExplanationService()

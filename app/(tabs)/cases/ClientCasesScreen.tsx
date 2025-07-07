@@ -1,29 +1,46 @@
-import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import MyCasesList from './MyCasesList';
-import CaseDetail from './CaseDetail';
-import NewCase from '../../NewCase';
-import CaseDocuments from './CaseDocuments';
-import CaseChat from './CaseChat';
-import AISummary from './AISummary';
-import ScheduleConsult from './ScheduleConsult';
-
-const Stack = createStackNavigator();
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text } from 'react-native';
+import ImprovedCaseList from '@/components/organisms/ImprovedCaseList';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { getUserCases, getCaseStats, CaseData } from '@/lib/services/cases';
 
 export default function ClientCasesScreen() {
+  const { user } = useAuth();
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [casesData, statsData] = await Promise.all([
+        getUserCases(user.id),
+        getCaseStats(user.id)
+      ]);
+      setCases(casesData);
+      setCaseStats(statsData);
+    } catch (e) {
+      setError('Falha ao carregar seus casos.');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="MyCasesList" component={MyCasesList} />
-      <Stack.Screen name="CaseDetail" component={CaseDetail} />
-      <Stack.Screen name="CaseDocuments" component={CaseDocuments} />
-      <Stack.Screen name="CaseChat" component={CaseChat} />
-      <Stack.Screen name="AISummary" component={AISummary} />
-      <Stack.Screen name="ScheduleConsult" component={ScheduleConsult} />
-      <Stack.Screen name="NewCase" component={NewCase} />
-    </Stack.Navigator>
+    <ImprovedCaseList
+      cases={cases}
+      caseStats={caseStats}
+      isLoading={isLoading}
+      error={error}
+      onRefresh={loadData}
+    />
   );
 } 

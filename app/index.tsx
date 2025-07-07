@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, SafeAreaView, Text } from 'react-native';
+import { View, StyleSheet, Alert, SafeAreaView, Text , ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { ActivityIndicator } from 'react-native';
 
 const TriagePage = () => {
   const { isLoading, session } = useAuth();

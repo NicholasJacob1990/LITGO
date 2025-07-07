@@ -1,31 +1,44 @@
 """
 Serviço para enviar notificações aos advogados (Push e E-mail).
+v2.3: Migrado de OneSignal para Expo Push Notifications para unificar com o frontend.
 """
-import os
-import httpx
-import logging
-import json
 import asyncio
-from typing import List, Dict, Any
-from redis import Redis
+import json
+import logging
+import os
+from typing import Any, Dict, List
 
-from supabase import create_client, Client
+import httpx
 from dotenv import load_dotenv
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from exponent_server_sdk import (
+    DeviceNotRegisteredError,
+    PushClient,
+    PushMessage,
+    PushServerError,
+    PushTicketError,
+)
+
+from backend.services.cache_service_simple import simple_cache_service as cache_service
+from redis import Redis
+from supabase import Client, create_client
 
 # --- Configuração ---
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-ONESIGNAL_APP_ID = os.getenv("ONESIGNAL_APP_ID")
-ONESIGNAL_API_KEY = os.getenv("ONESIGNAL_API_KEY")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@litgo.com")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+EXPO_TIMEOUT = int(os.getenv("EXPO_TIMEOUT", "15"))
+SENDGRID_TIMEOUT = int(os.getenv("SENDGRID_TIMEOUT", "15"))
 
 # Configurar logging
 logger = logging.getLogger(__name__)
 
 redis_client = Redis.from_url(REDIS_URL)
+
 
 def get_supabase_client() -> Client:
     """Cria e retorna um cliente Supabase."""
@@ -36,83 +49,108 @@ def get_supabase_client() -> Client:
 
 async def send_notifications_to_lawyers(lawyer_ids: List[str], payload: Dict[str, Any]):
     """
-    Envia notificações para uma lista de advogados via Push (OneSignal) e E-mail (fallback).
+    Envia notificações push para uma lista de advogados usando Expo.
+    v2.2: Adiciona guard-rail para evitar spam de notificações.
+    v2.3: Adaptado para Expo Push Notifications.
     """
     if not lawyer_ids:
-        logger.info("Nenhum advogado para notificar.")
         return
 
-    # Lê as variáveis de ambiente dinamicamente para permitir mocking em testes
-    onesignal_app_id = os.getenv("ONESIGNAL_APP_ID")
-    onesignal_api_key = os.getenv("ONESIGNAL_API_KEY")
-    
-    if not onesignal_app_id or not onesignal_api_key:
-        logger.warning("Variáveis do OneSignal não configuradas. Notificações push desabilitadas.")
+    # 1. Filtrar advogados que já foram notificados recentemente
+    eligible_lawyer_ids = []
+    for lawyer_id in lawyer_ids:
+        cache_key = f"notification_cooldown:{lawyer_id}"
+        is_on_cooldown = await cache_service.get(cache_key)
+        if not is_on_cooldown:
+            eligible_lawyer_ids.append(lawyer_id)
+
+    if not eligible_lawyer_ids:
+        logger.info("Nenhum advogado elegível para notificação (todos em cooldown).")
         return
 
+    # 2. Buscar dados dos advogados elegíveis
     supabase = get_supabase_client()
-    
     try:
-        # Busca os tokens de push e e-mails dos advogados
-        lawyers_response = supabase.table("lawyers")\
-            .select("id, profile:profiles(push_token, email)")\
-            .in_("id", lawyer_ids)\
+        lawyers_response = supabase.table("profiles") \
+            .select("id, expo_push_token, email") \
+            .in_("id", eligible_lawyer_ids) \
             .execute()
+
+        lawyers_data = lawyers_response.data
+        if not lawyers_data:
+            return
+
+        # 3. Preparar e enviar notificações
+        tasks = []
+        for lawyer in lawyers_data:
+            push_token = lawyer.get("expo_push_token")
+            email = lawyer.get("email")
             
-        lawyers = lawyers_response.data
-        
-        async with httpx.AsyncClient() as client:
-            tasks = []
-            for lawyer in lawyers:
-                # --- Guard-rail de Rate Limiting ---
-                rate_limit_key = f"notify_ratelimit:{lawyer['id']}"
-                if redis_client.exists(rate_limit_key):
-                    logger.warning(f"Rate limit atingido para o advogado {lawyer['id']}. Notificação pulada.")
-                    continue
-                
-                profile = lawyer.get("profile")
-                if not profile:
-                    continue
-                
-                # Prioriza notificação Push
-                if profile.get("push_token"):
-                    tasks.append(_send_onesignal_push(client, profile["push_token"], payload, onesignal_app_id, onesignal_api_key))
-                # Fallback para E-mail
-                elif profile.get("email"):
-                    tasks.append(_send_email_notification(supabase, profile["email"], payload))
-                
-                # Define o rate limit no Redis após agendar a notificação
-                redis_client.set(rate_limit_key, 1, ex=300) # Expira em 5 minutos
-            
+            title = payload.get("headline", "Novo Caso Disponível")
+            message = payload.get("summary", "Um novo caso compatível com seu perfil está disponível.")
+            extra_data = payload.get("data", {})
+
+            if push_token:
+                tasks.append(send_push_notification(push_token, title, message, extra_data))
+            elif email:
+                tasks.append(send_email_notification(email, title, message))
+
+        if tasks:
             await asyncio.gather(*tasks)
+
+        # 4. Marcar advogados notificados no cache
+        for lawyer_id in eligible_lawyer_ids:
+            cache_key = f"notification_cooldown:{lawyer_id}"
+            # 5 minutos de cooldown
+            await cache_service.set(cache_key, {"notified": True}, ttl=300)
+
+        logger.info(f"Notificações enviadas para {len(eligible_lawyer_ids)} advogados.")
 
     except Exception as e:
         logger.error(f"Erro ao buscar dados dos advogados para notificação: {e}")
 
 
-async def _send_onesignal_push(client: httpx.AsyncClient, push_token: str, payload: Dict[str, Any], app_id: str, api_key: str):
-    """Envia uma notificação push via OneSignal."""
-    headers = {
-        "Authorization": f"Basic {api_key}",
-        "Content-Type": "application/json"
-    }
-    json_payload = {
-        "app_id": app_id,
-        "include_player_ids": [push_token],
-        "headings": {"en": payload.get("headline", "Novo Caso Disponível")},
-        "contents": {"en": payload.get("summary", "Um novo caso compatível com seu perfil está disponível.")},
-        "data": payload
-    }
-    
+async def send_push_notification(token: str, title: str, message: str, data: dict = None) -> bool:
+    """Envia uma notificação push via Expo."""
     try:
-        response = await client.post("https://onesignal.com/api/v1/notifications", headers=headers, json=json_payload)
-        response.raise_for_status()
-        logger.info(f"Push enviado para token {push_token[:10]}...: {response.status_code}")
-    except httpx.HTTPStatusError as e:
-        logger.error(f"Erro na API OneSignal para token {push_token[:10]}...: {e.response.text}")
+        # Verifica se o token é válido para Expo
+        if not PushClient.is_exponent_push_token(token):
+            logger.warning(f"Token '{token}' não é um token válido do Expo. Notificação não enviada.")
+            return False
+
+        push_client = PushClient()
+        push_message = PushMessage(
+            to=token,
+            title=title,
+            body=message,
+            data=data or {},
+            sound="default",
+            priority="high",
+            channel_id="default"
+        )
+        
+        response = push_client.publish(push_message)
+        response.validate_response()
+        logger.info(f"Push notification sent to token {token[:10]}... Ticket: {response.id}")
+        return True
+
+    except DeviceNotRegisteredError:
+        logger.warning(f"Dispositivo com token {token[:10]}... não está mais registrado. É preciso remover o token do banco.")
+        # TODO: Implementar lógica para remover o token do banco de dados.
+        return False
+    except PushServerError as e:
+        logger.error(f"Erro no servidor do Expo: {e}")
+        return False
+    except PushTicketError as e:
+        logger.error(f"Erro no ticket de push do Expo: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Erro inesperado ao enviar notificação push via Expo: {e}")
+        return False
 
 
-async def _send_email_notification(supabase: Client, email: str, payload: Dict[str, Any]):
+async def _send_email_notification(
+        supabase: Client, email: str, payload: Dict[str, Any]):
     """Envia e-mail usando SendGrid como fallback quando Push não está disponível."""
     sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
     from_email = os.getenv("SENDGRID_FROM_EMAIL", "no-reply@litgo.com")
@@ -136,4 +174,51 @@ async def _send_email_notification(supabase: Client, email: str, payload: Dict[s
         await loop.run_in_executor(None, SendGridAPIClient(sendgrid_api_key).send, message)
         logger.info(f"E-mail enviado para {email}")
     except Exception as e:
-        logger.error(f"Erro ao enviar e-mail para {email}: {e}") 
+        logger.error(f"Erro ao enviar e-mail para {email}: {e}")
+
+
+# Funções públicas para compatibilidade com o código existente
+async def send_push_notification_legacy(
+        user_id: str, title: str, message: str, data: dict = None) -> bool:
+    """Função legada do OneSignal, mantida para referência e eventual remoção."""
+    logger.warning("A função 'send_push_notification_legacy' (OneSignal) foi chamada, mas está desativada. Use a nova implementação Expo.")
+    return False
+
+async def send_email_notification(email: str, subject: str, content: str) -> bool:
+    """Envia notificação por email via SendGrid"""
+    try:
+        async with httpx.AsyncClient(timeout=SENDGRID_TIMEOUT) as client:
+            headers = {
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            message = {
+                "personalizations": [{
+                    "to": [{"email": email}]
+                }],
+                "from": {"email": FROM_EMAIL, "name": "LITGO"},
+                "subject": subject,
+                "content": [{
+                    "type": "text/html",
+                    "value": content
+                }]
+            }
+
+            response = await client.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers=headers,
+                json=message
+            )
+
+            if response.status_code in [200, 202]:
+                logger.info(f"Email sent to {email}")
+                return True
+            else:
+                logger.error(
+                    f"Failed to send email: {response.status_code} - {response.text}")
+                return False
+
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+        return False

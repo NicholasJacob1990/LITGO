@@ -1,94 +1,195 @@
 # backend/triage_service.py
+import asyncio
+import json
 import os
 import re
+import time
+from functools import wraps
+from typing import Dict, List, Literal, Optional
+
 import anthropic
+import openai
 from dotenv import load_dotenv
 
-# Importação do novo serviço de embedding
+# Importação do serviço de embedding
 from .embedding_service import generate_embedding
 
 load_dotenv()
 
-# --- Configuração do Cliente Anthropic ---
+# --- Configuração dos Clientes ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Modelo "Juiz" (o mais poderoso disponível)
+JUDGE_MODEL_PROVIDER = os.getenv(
+    "JUDGE_MODEL_PROVIDER",
+    "anthropic")  # 'anthropic' ou 'openai'
+JUDGE_MODEL_ANTHROPIC = "claude-3-opus-20240229"
+JUDGE_MODEL_OPENAI = "gpt-4-turbo"
+SIMPLE_MODEL_CLAUDE = "claude-3-haiku-20240307"
+
+Strategy = Literal["simple", "failover", "ensemble"]
+
 
 class TriageService:
     def __init__(self):
-        if not ANTHROPIC_API_KEY:
-            print("Aviso: Chave da API da Anthropic (ANTHROPIC_API_KEY) não encontrada. Usando fallback de regex.")
-            self.client = None
-        else:
-            self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        # Cliente Anthropic (Claude)
+        self.anthropic_client = anthropic.AsyncAnthropic(
+            api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+        # Cliente OpenAI (ChatGPT)
+        self.openai_client = openai.AsyncOpenAI(
+            api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-    async def run_triage(self, text: str) -> dict:
-        """
-        Executa a triagem, gera o embedding e retorna os dados consolidados.
-        """
-        triage_results = {}
-        if self.client:
-            try:
-                triage_results = await self._run_claude_triage(text)
-            except Exception as e:
-                print(f"Erro na triagem com Claude: {e}. Usando fallback.")
-                triage_results = self._run_regex_fallback(text)
-        else:
-            triage_results = self._run_regex_fallback(text)
+        if not self.anthropic_client:
+            print("Aviso: Chave da API da Anthropic não encontrada.")
+        if not self.openai_client:
+            print("Aviso: Chave da API da OpenAI não encontrada.")
 
-        # Geração do embedding a partir do resumo
-        summary = triage_results.get("summary")
-        if summary:
-            embedding_vector = await generate_embedding(summary)
-            triage_results["summary_embedding"] = embedding_vector
-        else:
-            triage_results["summary_embedding"] = None # Garante que o campo exista
-
-        return triage_results
-
-    async def _run_claude_triage(self, text: str) -> dict:
-        """
-        Chama a API do Claude para extrair informações estruturadas do texto.
-        """
-        if not self.client:
+    async def _run_claude_triage(
+            self, text: str, model: str = "claude-3-5-sonnet-20240620") -> Dict:
+        """Chama um modelo Claude para extrair informações estruturadas."""
+        if not self.anthropic_client:
             raise Exception("Cliente Anthropic não inicializado.")
 
-        # Tool (função) que queremos que o Claude preencha com os dados extraídos
         triage_tool = {
             "name": "extract_case_details",
             "description": "Extrai detalhes estruturados de um relato de caso jurídico.",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "area": {"type": "string", "description": "A principal área jurídica do caso (ex: Trabalhista, Cível, Criminal)."},
-                    "subarea": {"type": "string", "description": "A subárea ou assunto específico (ex: Rescisão Indireta, Contrato de Aluguel)."},
-                    "urgency_h": {"type": "integer", "description": "Estimativa da urgência em horas para uma ação inicial (ex: 24, 72)."},
-                    "summary": {"type": "string", "description": "Um resumo conciso do caso em uma frase."}
+                    "area": {"type": "string"}, "subarea": {"type": "string"},
+                    "urgency_h": {"type": "integer"}, "summary": {"type": "string"},
+                    "keywords": {"type": "array", "items": {"type": "string"}},
+                    "sentiment": {"type": "string", "enum": ["Positivo", "Neutro", "Negativo"]}
                 },
-                "required": ["area", "subarea", "urgency_h", "summary"]
+                "required": ["area", "subarea", "urgency_h", "summary", "keywords", "sentiment"]
             }
         }
 
-        message = self.client.messages.create(
-            model="claude-3-5-sonnet-20240620",
-            max_tokens=1024,
-            tools=[triage_tool],
+        message = await self.anthropic_client.messages.create(
+            model=model, max_tokens=1024, tools=[triage_tool],
             tool_choice={"type": "tool", "name": "extract_case_details"},
-            messages=[
-                {"role": "user", "content": f"Analise o seguinte relato de caso jurídico e extraia os detalhes estruturados: '{text}'"}
-            ]
+            messages=[{"role": "user",
+                       "content": f"Analise o caso e extraia os detalhes: '{text}'"}]
         )
 
-        # Extrai o conteúdo da ferramenta preenchida pelo modelo
-        if message.content and isinstance(message.content, list) and message.content[0].type == 'tool_use':
-            tool_result = message.content[0].input
-            return {
-                "area": tool_result.get("area", "Não identificado"),
-                "subarea": tool_result.get("subarea", "Não identificado"),
-                "urgency_h": tool_result.get("urgency_h", 72),
-                "summary": tool_result.get("summary", "N/A"),
-            }
+        if message.content and isinstance(
+                message.content, list) and message.content[0].type == 'tool_use':
+            return message.content[0].input
+        raise Exception(
+            f"A resposta do Claude ({model}) não continha os dados esperados.")
+
+    async def _run_openai_triage(self, text: str) -> Dict:
+        """Chama a API do ChatGPT para extrair informações com JSON mode."""
+        if not self.openai_client:
+            raise Exception("Cliente OpenAI não inicializado.")
+
+        prompt = f"Analise a transcrição e extraia os dados em JSON. Transcrição: {text}"
+
+        response = await self.openai_client.chat.completions.create(
+            model="gpt-4o", response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": "Você é um assistente que extrai dados de textos legais para um JSON com os campos: area, subarea, urgency_h, summary, keywords, sentiment."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return json.loads(response.choices[0].message.content)
+
+    def _compare_results(
+            self, result1: Optional[Dict], result2: Optional[Dict]) -> bool:
+        """Compara se os campos críticos dos dois resultados são idênticos."""
+        if not result1 or not result2:
+            return False
+        critical_fields = ["area", "subarea"]
+        return all(str(result1.get(f, "")).strip().lower() == str(
+            result2.get(f, "")).strip().lower() for f in critical_fields)
+
+    async def _run_judge_triage(self, text: str, result1: Dict, result2: Dict) -> Dict:
+        """Chama uma IA 'juiz' para decidir entre dois resultados conflitantes."""
+        prompt = f"Você é um Sócio-Diretor. Revise a transcrição e os dois JSONs dos seus assistentes. Produza um JSON final e definitivo, com uma justificativa.\n\nTranscrição: {text}\n\nAssistente 1 (Claude):\n{
+            json.dumps(
+                result1,
+                indent=2,
+                ensure_ascii=False)}\n\nAssistente 2 (OpenAI):\n{
+            json.dumps(
+                result2,
+                indent=2,
+                ensure_ascii=False)}\n\nSua Saída Final (apenas JSON):"
+
+        if JUDGE_MODEL_PROVIDER == 'openai' and self.openai_client:
+            response = await self.openai_client.chat.completions.create(
+                model=JUDGE_MODEL_OPENAI, response_format={"type": "json_object"},
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return json.loads(response.choices[0].message.content)
+        elif JUDGE_MODEL_PROVIDER == 'anthropic' and self.anthropic_client:
+            message = await self.anthropic_client.messages.create(
+                model=JUDGE_MODEL_ANTHROPIC, max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            # Extrair JSON da resposta de texto
+            match = re.search(r'\{.*\}', message.content[0].text, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            raise Exception("A resposta do Juiz (Claude) não continha um JSON válido.")
         else:
-            raise Exception("A resposta do LLM não continha os dados esperados.")
-            
+            # Fallback se o juiz preferido não estiver disponível
+            return result1
+
+    async def _run_failover_strategy(self, text: str) -> Dict:
+        try:
+            return await self._run_claude_triage(text)
+        except Exception as e:
+            print(f"Falha no Claude (principal), tentando OpenAI (backup): {e}")
+            return await self._run_openai_triage(text)
+
+    async def _run_ensemble_strategy(self, text: str) -> Dict:
+        tasks = [
+            self._run_claude_triage(
+                text) if self.anthropic_client else asyncio.sleep(0, result=None),
+            self._run_openai_triage(
+                text) if self.openai_client else asyncio.sleep(0, result=None)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        successful_results = [res for res in results if not isinstance(res, Exception)]
+
+        if not successful_results:
+            raise Exception("Ambas as IAs falharam no ensemble.")
+        if len(successful_results) == 1:
+            return successful_results[0]
+
+        res1, res2 = successful_results
+        if self._compare_results(res1, res2):
+            return res1
+
+        print("Resultados divergentes, acionando o Juiz.")
+        return await self._run_judge_triage(text, res1, res2)
+
+    async def run_triage(self, text: str, strategy: Strategy) -> dict:
+        """Ponto de entrada principal para a triagem."""
+        print(f"Executando estratégia de triagem: {strategy}")
+        triage_results = {}
+
+        try:
+            if strategy == 'simple':
+                triage_results = await self._run_claude_triage(text, model=SIMPLE_MODEL_CLAUDE)
+            elif strategy == 'ensemble':
+                triage_results = await self._run_ensemble_strategy(text)
+            else:  # Padrão é 'failover'
+                triage_results = await self._run_failover_strategy(text)
+        except Exception as e:
+            print(f"Estratégia '{strategy}' falhou: {e}. Usando fallback de regex.")
+            triage_results = self._run_regex_fallback(text)
+
+        summary = triage_results.get("summary")
+        if summary:
+            embedding_vector = await generate_embedding(summary)
+            triage_results["summary_embedding"] = embedding_vector
+        else:
+            triage_results["summary_embedding"] = None
+
+        return triage_results
+
     def _run_regex_fallback(self, text: str) -> dict:
         """
         Fallback simples que usa regex para extrair a área jurídica.
@@ -97,7 +198,7 @@ class TriageService:
 
         # -------- Heurística de área --------------------------------------
         area = "Cível"  # padrão
-        subarea = "A ser definido"
+        subarea = "Geral"
 
         trabalhista = r"trabalho|trabalhista|demitido|verbas? rescisórias|rescisão|salário"
         criminal = r"pol[ií]cia|crime|criminoso|preso|roubo|furto|homic[ií]dio"
@@ -139,8 +240,182 @@ class TriageService:
             "area": area,
             "subarea": subarea,
             "urgency_h": urgency_h,
-            "summary": text[:150]
+            "summary": text[:150],
+            "keywords": re.findall(r'\b\w{5,}\b', text.lower())[:5],
+            "sentiment": "Neutro"
         }
 
-# Instância única para ser usada na aplicação
-triage_service = TriageService() 
+    async def run_detailed_analysis(self, text: str) -> dict:
+        """
+        Executa análise detalhada usando o schema rico do OpenAI.
+        Esta função complementa a triagem básica com insights profundos.
+        """
+        if not self.openai_client:
+            print("Cliente OpenAI não disponível para análise detalhada.")
+            return self._generate_fallback_detailed_analysis(text)
+
+        detailed_prompt = """
+        Você é o "LEX-9000", um assistente jurídico especializado em Direito Brasileiro.
+        Sua função é fornecer uma análise jurídica detalhada e estruturada.
+
+        IMPORTANTE: Retorne APENAS um JSON válido seguindo exatamente esta estrutura:
+
+        {
+          "classificacao": {
+            "area_principal": "Ex: Direito Trabalhista",
+            "assunto_principal": "Ex: Rescisão Indireta",
+            "subarea": "Ex: Verbas Rescisórias",
+            "natureza": "Preventivo|Contencioso"
+          },
+          "dados_extraidos": {
+            "partes": [
+              {
+                "nome": "Nome da parte",
+                "tipo": "Requerente|Requerido|Terceiro",
+                "qualificacao": "Pessoa física/jurídica, profissão, etc."
+              }
+            ],
+            "fatos_principais": [
+              "Fato 1 em ordem cronológica",
+              "Fato 2 em ordem cronológica"
+            ],
+            "pedidos": [
+              "Pedido principal",
+              "Pedidos secundários"
+            ],
+            "valor_causa": "R$ X.XXX,XX ou Inestimável",
+            "documentos_mencionados": [
+              "Documento 1",
+              "Documento 2"
+            ],
+            "cronologia": "YYYY-MM-DD do fato inicial até hoje"
+          },
+          "analise_viabilidade": {
+            "classificacao": "Viável|Parcialmente Viável|Inviável",
+            "pontos_fortes": [
+              "Ponto forte 1",
+              "Ponto forte 2"
+            ],
+            "pontos_fracos": [
+              "Ponto fraco 1",
+              "Ponto fraco 2"
+            ],
+            "probabilidade_exito": "Alta|Média|Baixa",
+            "justificativa": "Análise fundamentada da viabilidade",
+            "complexidade": "Baixa|Média|Alta",
+            "custos_estimados": "Baixo|Médio|Alto"
+          },
+          "urgencia": {
+            "nivel": "Crítica|Alta|Média|Baixa",
+            "motivo": "Justificativa da urgência",
+            "prazo_limite": "Data limite ou N/A",
+            "acoes_imediatas": [
+              "Ação 1",
+              "Ação 2"
+            ]
+          },
+          "aspectos_tecnicos": {
+            "legislacao_aplicavel": [
+              "Lei X, art. Y",
+              "Código Z, art. W"
+            ],
+            "jurisprudencia_relevante": [
+              "STF/STJ Tema X",
+              "Súmula Y"
+            ],
+            "competencia": "Justiça Federal/Estadual/Trabalhista",
+            "foro": "Comarca/Seção específica",
+            "alertas": [
+              "Alerta sobre prescrição",
+              "Alerta sobre documentação"
+            ]
+          },
+          "recomendacoes": {
+            "estrategia_sugerida": "Judicial|Extrajudicial|Negociação",
+            "proximos_passos": [
+              "Passo 1",
+              "Passo 2"
+            ],
+            "documentos_necessarios": [
+              "Documento essencial 1",
+              "Documento essencial 2"
+            ],
+            "observacoes": "Observações importantes para o advogado"
+          }
+        }
+        """
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o",
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": detailed_prompt},
+                    {"role": "user",
+                     "content": f"Analise detalhadamente este caso jurídico:\n\n{text}"}
+                ],
+                temperature=0.3,
+                max_tokens=4096
+            )
+
+            detailed_analysis = json.loads(response.choices[0].message.content)
+            return detailed_analysis
+
+        except Exception as e:
+            print(f"Erro na análise detalhada OpenAI: {e}")
+            return self._generate_fallback_detailed_analysis(text)
+
+    def _generate_fallback_detailed_analysis(self, text: str) -> dict:
+        """
+        Fallback para análise detalhada quando OpenAI não está disponível.
+        """
+        basic_triage = self._run_regex_fallback(text)
+
+        return {
+            "classificacao": {
+                "area_principal": basic_triage.get("area", "Não identificado"),
+                "assunto_principal": "A ser definido",
+                "subarea": basic_triage.get("subarea", "Geral"),
+                "natureza": "Contencioso"
+            },
+            "dados_extraidos": {
+                "partes": [{"nome": "Cliente", "tipo": "Requerente", "qualificacao": "Pessoa física"}],
+                "fatos_principais": [text[:200] + "..."],
+                "pedidos": ["A ser definido"],
+                "valor_causa": "A ser estimado",
+                "documentos_mencionados": [],
+                "cronologia": "Não informado"
+            },
+            "analise_viabilidade": {
+                "classificacao": "Parcialmente Viável",
+                "pontos_fortes": ["Necessária análise mais detalhada"],
+                "pontos_fracos": ["Informações limitadas"],
+                "probabilidade_exito": "Média",
+                "justificativa": "Análise preliminar baseada em informações limitadas",
+                "complexidade": "Média",
+                "custos_estimados": "Médio"
+            },
+            "urgencia": {
+                "nivel": "Média",
+                "motivo": "Estimativa baseada na área jurídica",
+                "prazo_limite": "N/A",
+                "acoes_imediatas": ["Consultar advogado especializado"]
+            },
+            "aspectos_tecnicos": {
+                "legislacao_aplicavel": ["A ser definido"],
+                "jurisprudencia_relevante": ["A ser pesquisado"],
+                "competencia": "A ser definido",
+                "foro": "A ser definido",
+                "alertas": ["Análise preliminar - requer revisão especializada"]
+            },
+            "recomendacoes": {
+                "estrategia_sugerida": "Extrajudicial",
+                "proximos_passos": ["Consultar advogado", "Reunir documentação"],
+                "documentos_necessarios": ["Documentos relacionados ao caso"],
+                "observacoes": "Esta é uma análise preliminar. Consulte um advogado para análise completa."
+            }
+        }
+
+
+# Instância única
+triage_service = TriageService()

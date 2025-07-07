@@ -1,59 +1,88 @@
 # backend/explanation_service.py
 import os
-import anthropic
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 from dotenv import load_dotenv
 
+from backend.algoritmo_match import KPI, Case, Lawyer, MatchmakingAlgorithm
+from backend.models import ExplainRequest, ExplainResponse, Explanation
+from supabase import Client, create_client
+
+# Configuração
 load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-# --- Configuração do Cliente Anthropic ---
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+algo = MatchmakingAlgorithm()
 
-class ExplanationService:
-    def __init__(self):
-        if not ANTHROPIC_API_KEY:
-            print("Aviso: Chave da API da Anthropic (ANTHROPIC_API_KEY) não encontrada.")
-            self.client = None
-        else:
-            self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    async def generate_explanation(self, case_summary: str, lawyer_data: dict) -> str:
-        """
-        Gera uma explicação concisa do motivo pelo qual um advogado é um bom match.
-        """
-        if not self.client:
-            return "O serviço de IA para gerar explicações está indisponível no momento."
+async def generate_explanations_for_matches(
+    req: ExplainRequest,
+) -> Optional[ExplainResponse]:
+    """
+    Gera explicações detalhadas para o match entre um caso e advogados.
+    v2.2: Usa o novo `algo.rank` para obter o breakdown detalhado.
+    """
+    # 1. Carregar dados do caso
+    case_row = supabase.table("cases").select(
+        "*").eq("id", req.case_id).single().execute().data
+    if not case_row:
+        return None
 
-        prompt = f"""
-        Você é um assistente jurídico que ajuda clientes a entenderem por que um advogado é uma boa escolha para seu caso.
-        
-        Resumo do Caso do Cliente:
-        "{case_summary}"
+    case = Case(
+        id=case_row["id"],
+        area=case_row["area"],
+        subarea=case_row["subarea"],
+        urgency_h=case_row["urgency_h"],
+        coords=tuple(case_row["coords"]),
+        complexity=case_row.get("complexity", "MEDIUM"),
+        summary_embedding=np.array(
+            case_row.get(
+                "summary_embedding",
+                []),
+            dtype=np.float32),
+    )
 
-        Dados do Advogado:
-        - Nome: {lawyer_data.get('nome', 'N/A')}
-        - Score de Match (Fair): {lawyer_data.get('fair', 0):.2f}
-        - Score de Qualificação (Q): {lawyer_data.get('features', {}).get('Q', 0):.2f}
-        - Score de Similaridade de Casos (S): {lawyer_data.get('features', {}).get('S', 0):.2f}
-        - Taxa de Sucesso (T): {lawyer_data.get('features', {}).get('T', 0):.2f}
-        - Distância: {lawyer_data.get('distance_km', 0):.1f} km
+    # 2. Carregar dados dos advogados especificados
+    lawyer_rows = supabase.table("lawyers").select(
+        "*").in_("id", req.lawyer_ids).execute().data
 
-        Tarefa:
-        Com base nos dados acima, escreva uma explicação curta (2-3 frases, em markdown) para o cliente, destacando os 2 ou 3 pontos mais fortes do advogado para este caso específico. Use uma linguagem clara e positiva.
-        Exemplo: "Dr(a). [Nome] parece uma ótima opção! Com uma alta taxa de sucesso em casos como o seu e excelentes qualificações na área, ele(a) está bem preparado(a) para te ajudar. Além disso, seu escritório fica próximo a você."
-        """
-        
-        try:
-            message = self.client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=256,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+    candidates = [
+        Lawyer(
+            id=r["id"],
+            nome=r["nome"],
+            tags_expertise=r["tags_expertise"],
+            geo_latlon=tuple(r["geo_latlon"]),
+            curriculo_json=r.get("curriculo_json", {}),
+            kpi=KPI(**r.get("kpi", {})),
+            kpi_subarea=r.get("kpi_subarea", {}),
+            kpi_softskill=r.get("kpi_softskill", 0.0),
+            case_outcomes=r.get("case_outcomes", [])
+        ) for r in lawyer_rows
+    ]
+
+    if not candidates:
+        return None
+
+    # 3. Executar o ranking para obter scores detalhados
+    ranked_lawyers = await algo.rank(case, candidates, top_n=len(candidates), preset=req.preset)
+
+    explanations = []
+    for lw in ranked_lawyers:
+        scores = lw.scores
+        explanations.append(
+            Explanation(
+                lawyer_id=lw.id,
+                raw_score=scores.get("raw", 0),
+                features=scores.get("features", {}),
+                breakdown=scores.get("delta")
             )
-            return message.content[0].text if message.content else "Não foi possível gerar uma explicação."
-        except Exception as e:
-            print(f"Erro ao gerar explicação com Claude: {e}")
-            return "Houve um erro ao gerar a explicação. Tente novamente."
+        )
 
-# Instância única
-explanation_service = ExplanationService() 
+    return ExplainResponse(case_id=case.id, explanations=explanations)
+
+
+# Instância do serviço para importação
+explanation_service = generate_explanations_for_matches

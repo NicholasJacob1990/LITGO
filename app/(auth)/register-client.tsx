@@ -26,8 +26,42 @@ export default function RegisterClient() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Função para extrair apenas números de uma string
+  const extractNumbers = (value: string) => value.replace(/[^\d]/g, '');
+  
+  // Funções de formatação
+  const formatCPF = (value: string) => {
+    const numbers = extractNumbers(value);
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+  
+  const formatCNPJ = (value: string) => {
+    const numbers = extractNumbers(value);
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+  
+  const formatPhone = (value: string) => {
+    const numbers = extractNumbers(value);
+    if (numbers.length <= 10) {
+      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1)$2-$3');
+    } else {
+      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1)$2-$3');
+    }
+  };
+
   const handleInputChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let formattedValue = value;
+    
+    // Aplicar formatação baseada no campo
+    if (name === 'cpf') {
+      formattedValue = formatCPF(value);
+    } else if (name === 'cnpj') {
+      formattedValue = formatCNPJ(value);
+    } else if (name === 'phone') {
+      formattedValue = formatPhone(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: formattedValue }));
     // Clear error for the field being edited
     if (errors[name]) {
       setErrors(prev => {
@@ -45,7 +79,7 @@ export default function RegisterClient() {
     // Common fields validation
     if (!email.trim()) {
       newErrors.email = 'E-mail é obrigatório.';
-    } else if (!/S+@S+\.S+/.test(email)) {
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Formato de e-mail inválido.';
     }
     
@@ -57,8 +91,11 @@ export default function RegisterClient() {
     
     if (!phone.trim()) {
       newErrors.phone = 'Telefone é obrigatório.';
-    } else if (!/^d{10,11}$/.test(phone.replace(/[^d]/g, ''))) {
-      newErrors.phone = 'Formato de telefone inválido (DDD + número).';
+    } else {
+      const phoneNumbers = extractNumbers(phone);
+      if (phoneNumbers.length < 10 || phoneNumbers.length > 11) {
+        newErrors.phone = 'Formato de telefone inválido (DDD + número).';
+      }
     }
 
     // Conditional fields validation
@@ -68,8 +105,11 @@ export default function RegisterClient() {
         }
         if (!cpf.trim()) {
           newErrors.cpf = 'CPF é obrigatório.';
-        } else if (!/^d{11}$/.test(cpf.replace(/[^d]/g, ''))) {
-          newErrors.cpf = 'CPF deve ter 11 dígitos.';
+        } else {
+          const cpfNumbers = extractNumbers(cpf);
+          if (cpfNumbers.length !== 11) {
+            newErrors.cpf = 'CPF deve ter 11 dígitos.';
+          }
         }
     } else { // PJ
         if (!companyName.trim()) {
@@ -77,8 +117,11 @@ export default function RegisterClient() {
         }
         if (!cnpj.trim()) {
           newErrors.cnpj = 'CNPJ é obrigatório.';
-        } else if (!/^d{14}$/.test(cnpj.replace(/[^d]/g, ''))) {
-          newErrors.cnpj = 'CNPJ deve ter 14 dígitos.';
+        } else {
+          const cnpjNumbers = extractNumbers(cnpj);
+          if (cnpjNumbers.length !== 14) {
+            newErrors.cnpj = 'CNPJ deve ter 14 dígitos.';
+          }
         }
     }
 
@@ -176,18 +219,18 @@ export default function RegisterClient() {
           {userType === 'PF' ? (
             <>
               {renderInput('fullName', 'Nome Completo', { autoCapitalize: 'words' })}
-              {renderInput('cpf', 'CPF', { keyboardType: 'numeric', maxLength: 11 })}
+              {renderInput('cpf', 'CPF (000.000.000-00)', { keyboardType: 'numeric', maxLength: 14 })}
             </>
           ) : (
             <>
               {renderInput('companyName', 'Razão Social', { autoCapitalize: 'words' })}
-              {renderInput('cnpj', 'CNPJ', { keyboardType: 'numeric', maxLength: 14 })}
+              {renderInput('cnpj', 'CNPJ (00.000.000/0000-00)', { keyboardType: 'numeric', maxLength: 18 })}
             </>
           )}
 
           {/* Campos Comuns */}
           {renderInput('email', 'E-mail', { keyboardType: 'email-address', autoCapitalize: 'none' })}
-          {renderInput('phone', 'Telefone', { keyboardType: 'phone-pad', maxLength: 15 })}
+          {renderInput('phone', 'Telefone (11)99999-9999', { keyboardType: 'phone-pad', maxLength: 15 })}
 
           <View style={styles.inputContainer}>
             <View style={[styles.passwordWrapper, errors.password && styles.inputError]}>

@@ -1,8 +1,10 @@
 # backend/tests/seed.py
-import os
-from supabase import create_client, Client
-from dotenv import load_dotenv
 import logging
+import os
+
+from dotenv import load_dotenv
+
+from supabase import Client, create_client
 
 # --- Configuração ---
 load_dotenv()
@@ -11,9 +13,11 @@ logging.basicConfig(level=logging.INFO)
 # No ambiente de CI, estas vars virão do `env` do workflow
 SUPABASE_URL = os.getenv("SUPABASE_URL", "http://localhost:5432")
 # Use uma chave anon/pública segura para testes, nunca a de serviço
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY",
+                         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 def seed_database():
     """Popula o banco de dados de teste com dados iniciais."""
@@ -44,7 +48,7 @@ def seed_database():
             "subarea": "Verbas Rescisórias",
             "urgency_h": 48,
             "coords": [-23.55, -46.63],
-            "summary_embedding": [0.1] * 384 # Vetor de exemplo
+            "summary_embedding": [0.1] * 384  # Vetor de exemplo
         }
         supabase.table("cases").upsert(case_data).execute()
         logging.info(f"Caso de teste semeado: {case_data['id']}")
@@ -55,5 +59,6 @@ def seed_database():
         logging.error(f"Falha no seeding do banco de dados: {e}")
         raise
 
+
 if __name__ == "__main__":
-    seed_database() 
+    seed_database()

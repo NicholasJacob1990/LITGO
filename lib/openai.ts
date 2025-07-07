@@ -390,6 +390,87 @@ Termine a entrevista quando tiver informações suficientes sobre:
 }
 
 /**
+ * Nova função para integrar com o Pipeline de Triagem Híbrida do backend
+ * Envia transcrição completa para análise usando a estratégia apropriada
+ */
+export async function runHybridTriageAnalysis(
+  transcription: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  caseId?: string;
+  error?: string;
+  strategy?: 'simple' | 'failover' | 'ensemble';
+}> {
+  try {
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    const response = await fetch(`${API_BASE_URL}/triage/full-flow`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        transcription,
+        user_id: userId
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    return {
+      success: true,
+      caseId: result.case_id,
+      strategy: result.strategy_used
+    };
+    
+  } catch (error) {
+    console.error("❌ ERRO na análise híbrida:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro desconhecido"
+    };
+  }
+}
+
+/**
+ * Função para verificar status de processamento de triagem
+ */
+export async function checkTriageStatus(caseId: string): Promise<{
+  status: 'processing' | 'completed' | 'failed';
+  progress?: number;
+  result?: any;
+}> {
+  try {
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    const response = await fetch(`${API_BASE_URL}/triage/status/${caseId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+    
+  } catch (error) {
+    console.error("❌ ERRO ao verificar status:", error);
+    return {
+      status: 'failed'
+    };
+  }
+}
+
+/**
  * Gera um vetor de embedding para um texto usando a API da OpenAI.
  *
  * @param text - O texto a ser transformado em embedding.
