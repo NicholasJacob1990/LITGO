@@ -359,6 +359,65 @@ useEffect(() => {
 
 ---
 
+## 🌊 Fluxos de Usuário Detalhados
+
+Esta seção detalha os principais fluxos de interação do usuário com o aplicativo, explicando a lógica de negócio, os componentes envolvidos e as integrações com o backend.
+
+### 1. Cadastro de Advogado (`app/(auth)/register-lawyer.tsx`)
+
+Este é o ponto de entrada para advogados na plataforma. O processo é estruturado como um formulário de 5 etapas para garantir uma coleta de dados completa e organizada.
+
+**Visão Geral do Componente:**
+- **Localização:** `app/(auth)/register-lawyer.tsx`
+- **Propósito:** Coletar dados pessoais, profissionais, documentos e informações de diversidade de novos advogados.
+- **Frameworks/Libs:** React Native, Expo Router, Supabase, Lucide Icons.
+
+**Funcionalidades por Etapa:**
+
+1.  **Etapa 1: Informações Pessoais**
+    - Coleta de dados básicos: `Nome Completo`, `CPF`, `Telefone`, `E-mail` e `Senha`.
+    - Possui um controle para visibilidade da senha.
+
+2.  **Etapa 2: Dados Profissionais e Endereço**
+    - Coleta de informações essenciais para o match: `Nº da OAB`, `Áreas de atuação` (separadas por vírgula), e `Nº máximo de casos simultâneos`.
+    - O endereço é coletado de forma estruturada (`CEP`, `Rua`, `Número`, `Bairro`, `Cidade`, `UF`) para posterior geocodificação.
+
+3.  **Etapa 3: Documentos**
+    - **Upload de Currículo (Opcional, com IA):**
+        - O advogado pode enviar seu CV nos formatos PDF ou TXT.
+        - **Lógica de IA:**
+            1.  O texto do arquivo é extraído usando `extractTextFromFile`.
+            2.  O texto é enviado para a função `analyzeLawyerCV`, que utiliza um modelo de linguagem (LLM) para analisar o conteúdo.
+            3.  A IA identifica e extrai informações como nome, contato, número da OAB, anos de experiência e áreas de prática.
+            4.  Os campos do formulário são pré-preenchidos com os dados extraídos, agilizando o cadastro. O usuário é notificado e pode revisar as informações.
+    - **Upload de Documentos Obrigatórios:**
+        - Cópia da OAB (imagem).
+        - Comprovante de residência (imagem).
+        - Utiliza `expo-image-picker` e `expo-document-picker`.
+
+4.  **Etapa 4: Informações de Diversidade (Opcional)**
+    - Coleta dados como `Gênero`, `Etnia`, `Orientação Sexual`, e se o profissional se identifica como `PCD` ou `LGBTQIA+`.
+    - Um texto informativo explica que os dados são usados para promover equidade na distribuição de casos através do algoritmo de match.
+
+5.  **Etapa 5: Termos e Contrato**
+    - Exibe um texto final onde o usuário concorda com os Termos de Parceria e a Política de Privacidade ao finalizar o cadastro.
+
+**Lógica de Submissão (`handleNext` na última etapa):**
+
+O processo de finalização é uma transação com várias etapas críticas:
+
+1.  **Geocodificação:** O endereço completo é enviado ao `locationService.geocodeAddress` para obter as coordenadas `latitude` e `longitude`. Se a geocodificação falhar, o processo é interrompido.
+2.  **Criação de Usuário (Supabase Auth):** É feita uma chamada a `supabase.auth.signUp`. O `user_type` é definido como `LAWYER` e o `role` inicial como `lawyer_pending_approval`. As coordenadas geográficas são salvas nos metadados do usuário.
+3.  **Upload de Arquivos (Supabase Storage):** Os documentos (CV, OAB, comprovante) são enviados para um bucket de armazenamento seguro. O caminho do arquivo inclui o `user.id` para garantir a associação correta.
+    - **Tratamento de Erro:** Se o upload falhar, o sistema tenta deletar o usuário recém-criado (`supabase.auth.admin.deleteUser`) para evitar perfis incompletos e órfãos no sistema.
+4.  **Atualização de Metadados:** As informações de diversidade são salvas nos metadados do usuário através de `supabase.auth.updateUser`.
+5.  **Criação do Perfil (`lawyers`):** Um novo registro é inserido na tabela `lawyers` do banco de dados, contendo todas as informações profissionais, as URLs dos documentos e as coordenadas geográficas.
+6.  **Persistência da Análise de CV:** Se o CV foi analisado, os resultados estruturados da IA são salvos em uma tabela associada, vinculada ao `user.id` e à `cvUrl`.
+
+Após a conclusão bem-sucedida, o usuário recebe um alerta de confirmação e é redirecionado para a tela de login.
+
+---
+
 ## 🔄 Fluxo de Dados
 
 ### 1. Triagem de Caso
