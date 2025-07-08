@@ -11,6 +11,8 @@ interface CaseActionsProps {
   onChat?: () => void;
   onViewSummary?: () => void;
   onSchedule?: () => void;
+  onScheduleConsult?: () => void; // Add missing prop
+  onViewDocuments?: () => void; // Add missing prop
   variant?: 'compact' | 'full';
   showSummary?: boolean;
   showSchedule?: boolean;
@@ -21,6 +23,8 @@ export default function CaseActions({
   onChat,
   onViewSummary,
   onSchedule,
+  onScheduleConsult, // Add missing prop
+  onViewDocuments, // Add missing prop
   variant = 'compact',
   showSummary = false,
   showSchedule = false

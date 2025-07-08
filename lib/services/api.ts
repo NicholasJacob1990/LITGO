@@ -262,6 +262,7 @@ export interface Match {
   fair?: number;
   equity?: number;
   features?: Record<string, any>;
+  breakdown?: Record<string, number>; // Added breakdown property for compatibility analysis
 }
 
 export interface MatchResponseAPI {

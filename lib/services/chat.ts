@@ -5,12 +5,15 @@ export interface MessageData {
   id: string;
   case_id: string;
   user_id: string;
+  sender_id: string; // Add sender_id for backward compatibility
   content: string;
   read: boolean;
   created_at: string;
   sender?: {
     name: string;
+    full_name?: string; // Add full_name for compatibility
     avatar?: string;
+    avatar_url?: string; // Add avatar_url for compatibility
     role: 'client' | 'lawyer' | 'admin';
   };
 }

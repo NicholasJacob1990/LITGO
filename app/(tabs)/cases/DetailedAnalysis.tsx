@@ -29,8 +29,8 @@ import {
   Shield
 } from 'lucide-react-native';
 import TopBar from '@/components/layout/TopBar';
-import { Badge } from '@/components/atoms/Badge';
-import { ProgressBar } from '@/components/atoms/ProgressBar';
+import Badge from '@/components/atoms/Badge';
+import ProgressBar from '@/components/atoms/ProgressBar';
 import { getDetailedAnalysis } from '@/lib/services/api';
 
 interface DetailedAnalysis {
@@ -145,18 +145,18 @@ export default function DetailedAnalysis() {
     }
   };
 
-  const getUrgencyColor = (nivel: string) => {
+  const getUrgencyColor = (nivel: string): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' => {
     switch (nivel?.toLowerCase()) {
       case 'crítica':
-        return '#EF4444';
+        return 'danger';
       case 'alta':
-        return '#F59E0B';
+        return 'warning';
       case 'média':
-        return '#3B82F6';
+        return 'info';
       case 'baixa':
-        return '#10B981';
+        return 'success';
       default:
-        return '#6B7280';
+        return 'secondary';
     }
   };
 
@@ -170,6 +170,19 @@ export default function DetailedAnalysis() {
         return 30;
       default:
         return 50;
+    }
+  };
+
+  const getComplexityColor = (complexidade: string): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' => {
+    switch (complexidade?.toLowerCase()) {
+      case 'alta':
+        return 'danger';
+      case 'média':
+        return 'warning';
+      case 'baixa':
+        return 'success';
+      default:
+        return 'secondary';
     }
   };
 

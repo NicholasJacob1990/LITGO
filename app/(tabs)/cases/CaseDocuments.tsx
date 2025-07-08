@@ -161,7 +161,7 @@ export default function CaseDocuments() {
                 <Avatar 
                   src={(doc.uploader as any).avatar_url} 
                   name={(doc.uploader as any).full_name} 
-                  size="xsmall" 
+                  size="small" 
                 />
                 <Text style={styles.uploaderName}>
                   {(doc.uploader as any).full_name}
