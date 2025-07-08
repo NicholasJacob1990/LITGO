@@ -123,6 +123,7 @@
     "jest-environment-node": "^30.0.4",
     "jest-expo": "^53.0.9",
     "nativewind": "^4.1.23",
+    "patch-package": "^8.0.0",
     "typescript": "~5.8.3"
   }
 }
