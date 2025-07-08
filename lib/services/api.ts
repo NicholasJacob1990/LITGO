@@ -262,6 +262,9 @@ export interface Match {
   fair?: number;
   equity?: number;
   features?: Record<string, any>;
+  breakdown?: {
+    [key: string]: number;
+  };
 }
 
 export interface MatchResponseAPI {

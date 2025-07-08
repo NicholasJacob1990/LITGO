@@ -165,4 +165,8 @@ export const getVideoSessionsByCase = async (caseId: string): Promise<VideoSessi
     throw new Error('Erro ao buscar sessões de vídeo.');
   }
   return data;
-}; 
+};
+
+// Alias functions for backward compatibility
+export const createVideoConsultation = startVideoSession;
+export const getVideoSession = getVideoSessionsByCase; 
