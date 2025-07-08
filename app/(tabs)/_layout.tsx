@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Briefcase, User, Users, CreditCard, Gift, Users2, Star } from 'lucide-react-native';
+import { Home, Briefcase, User, Users, CreditCard, Gift, Star } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
