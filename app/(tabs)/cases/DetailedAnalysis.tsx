@@ -29,8 +29,8 @@ import {
   Shield
 } from 'lucide-react-native';
 import TopBar from '@/components/layout/TopBar';
-import { Badge } from '@/components/atoms/Badge';
-import { ProgressBar } from '@/components/atoms/ProgressBar';
+import Badge from '@/components/atoms/Badge';
+import ProgressBar from '@/components/atoms/ProgressBar';
 import { getDetailedAnalysis } from '@/lib/services/api';
 
 interface DetailedAnalysis {
