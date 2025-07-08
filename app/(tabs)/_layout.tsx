@@ -42,7 +42,6 @@ function AppTabs() {
         ...(role === 'lawyer'
           ? [
               { name: 'ofertas/index', title: 'Ofertas', icon: Gift },
-              { name: 'clientes/index', title: 'Clientes', icon: Users2 },
             ]
           : []),
         { name: 'profile/index', title: 'Perfil', icon: User },
