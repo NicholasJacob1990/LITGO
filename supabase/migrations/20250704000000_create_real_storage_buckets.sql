@@ -6,103 +6,29 @@
 -- =================================================================
 
 -- Bucket para documentos de advogados (CVs, OAB, comprovantes)
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'lawyer-documents', 
-  'lawyer-documents', 
-  false, 
-  10485760, -- 10MB
-  ARRAY[
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ]
-)
-ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+INSERT INTO storage.buckets (id, name)
+VALUES ('lawyer-documents', 'lawyer-documents')
+ON CONFLICT (id) DO NOTHING;
 
 -- Bucket para documentos de casos (petições, evidências, contratos)
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'case-documents', 
-  'case-documents', 
-  false, 
-  52428800, -- 50MB
-  ARRAY[
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  ]
-)
-ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+INSERT INTO storage.buckets (id, name)
+VALUES ('case-documents', 'case-documents')
+ON CONFLICT (id) DO NOTHING;
 
--- Bucket para anexos de suporte (já existe, mas vamos garantir configuração)
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'support_attachments', 
-  'support_attachments', 
-  false, 
-  20971520, -- 20MB
-  ARRAY[
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'text/plain',
-    'application/zip',
-    'application/x-zip-compressed'
-  ]
-)
-ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+-- Bucket para anexos de suporte
+INSERT INTO storage.buckets (id, name)
+VALUES ('support_attachments', 'support_attachments')
+ON CONFLICT (id) DO NOTHING;
 
 -- Bucket para contratos assinados
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'contracts', 
-  'contracts', 
-  false, 
-  31457280, -- 30MB
-  ARRAY[
-    'application/pdf',
-    'text/html',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ]
-)
-ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+INSERT INTO storage.buckets (id, name)
+VALUES ('contracts', 'contracts')
+ON CONFLICT (id) DO NOTHING;
 
 -- Bucket para avatars e imagens de perfil
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'avatars', 
-  'avatars', 
-  true, -- Público para fácil acesso
-  5242880, -- 5MB
-  ARRAY[
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp'
-  ]
-)
-ON CONFLICT (id) DO UPDATE SET
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+INSERT INTO storage.buckets (id, name)
+VALUES ('avatars', 'avatars')
+ON CONFLICT (id) DO NOTHING;
 
 -- =================================================================
 -- 2. Políticas RLS para lawyer-documents
@@ -274,15 +200,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 8. Comentários e documentação
 -- =================================================================
 
-COMMENT ON FUNCTION public.cleanup_orphaned_files() IS 'Remove arquivos órfãos dos buckets de storage após períodos específicos';
-
--- Comentários nos buckets
-UPDATE storage.buckets SET 
-  public = false,
-  avif_autodetection = false
-WHERE id IN ('lawyer-documents', 'case-documents', 'support_attachments', 'contracts');
-
-UPDATE storage.buckets SET 
-  public = true,
-  avif_autodetection = true
-WHERE id = 'avatars'; 
+COMMENT ON FUNCTION public.cleanup_orphaned_files() IS 'Remove arquivos órfãos dos buckets de storage após períodos específicos'; 
