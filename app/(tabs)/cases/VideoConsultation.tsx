@@ -1,21 +1,46 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Text, SafeAreaView } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, Text, SafeAreaView, Platform, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import Daily, { DailyEvent, DailyCall } from '@daily-co/react-native-daily-js';
-import { 
+
+// Platform-specific imports
+const Daily = Platform.OS !== 'web' ? require('@daily-co/react-native-daily-js').default : null;
+const DailyReactHooks = Platform.OS !== 'web' ? require('@daily-co/daily-react') : {};
+
+const { 
   DailyProvider, 
   useLocalParticipant, 
   useParticipant, 
   useMeetingState,
   useCallObject
-} from '@daily-co/daily-react';
+} = DailyReactHooks;
 
 import { CasesStackParamList } from '@/lib/types/cases';
 import VideoCallUI from '@/components/organisms/VideoCallUI';
 
 type VideoConsultationRouteProp = RouteProp<CasesStackParamList, 'VideoConsultation'>;
 
+// Web fallback component
+const WebVideoConsultation = () => {
+  const navigation = useNavigation();
+  
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.webContainer}>
+        <Text style={styles.webTitle}>Videoconsulta não disponível na web</Text>
+        <Text style={styles.webText}>
+          Use o aplicativo mobile para videoconsultas.
+        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.webButton}>
+          <Text style={styles.webButtonText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
+
 const ParticipantTile = ({ sessionId, isLocal }: { sessionId: string; isLocal: boolean }) => {
+  if (Platform.OS === 'web' || !useParticipant) return null;
+  
   const participant = useParticipant(sessionId);
 
   if (!participant) return null;
@@ -83,13 +108,20 @@ const CallView = () => {
 };
 
 export default function VideoConsultation() {
+  // On web, return the web fallback component
+  if (Platform.OS === 'web') {
+    return <WebVideoConsultation />;
+  }
+
   const navigation = useNavigation();
   const route = useRoute<VideoConsultationRouteProp>();
   const { roomUrl, token } = route.params;
 
-  const [callObject, setCallObject] = React.useState<DailyCall | null>(null);
+  const [callObject, setCallObject] = React.useState<any | null>(null);
 
   useEffect(() => {
+    if (!Daily) return;
+    
     const co = Daily.createCallObject();
     setCallObject(co);
     
@@ -180,5 +212,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
+  },
+  // Web-specific styles
+  webContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#1F2937',
+  },
+  webTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  webText: {
+    fontSize: 16,
+    color: '#E5E7EB',
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  webButton: {
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 8,
+  },
+  webButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 }); 
