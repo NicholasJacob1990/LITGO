@@ -93,11 +93,11 @@ export default function CaseChat() {
 
     try {
       setSending(true);
-      await sendMessage({
-        case_id: caseId,
-        sender_id: user?.id || '',
-        content: newMessage.trim(),
-      });
+      await sendMessage(
+        caseId,
+        user?.id || '',
+        newMessage.trim()
+      );
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);

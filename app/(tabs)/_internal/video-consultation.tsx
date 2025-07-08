@@ -58,11 +58,7 @@ export default function VideoConsultationScreen() {
         }
       } else {
         // Criar nova consulta de vídeo
-        const consultation = await createVideoConsultation(
-          user.id,
-          lawyerId,
-          caseId
-        );
+        const consultation = await createVideoConsultation(caseId);
         videoSession = consultation.session;
         
         // Determinar qual token usar baseado no tipo de usuário
@@ -70,9 +66,9 @@ export default function VideoConsultationScreen() {
         const token = isLawyer ? consultation.lawyerToken : consultation.clientToken;
         
         setVideoData({
-          roomUrl: consultation.room.url,
+          roomUrl: consultation.roomUrl,
           token: token,
-          sessionId: consultation.session.id,
+          sessionId: consultation.session?.id || '',
           participantName: user.user_metadata?.full_name || 'Usuário',
         });
       }

@@ -29,8 +29,8 @@ import {
   Shield
 } from 'lucide-react-native';
 import TopBar from '@/components/layout/TopBar';
-import { Badge } from '@/components/atoms/Badge';
-import { ProgressBar } from '@/components/atoms/ProgressBar';
+import Badge from '@/components/atoms/Badge';
+import ProgressBar from '@/components/atoms/ProgressBar';
 import { getDetailedAnalysis } from '@/lib/services/api';
 
 interface DetailedAnalysis {
@@ -323,7 +323,7 @@ export default function DetailedAnalysis() {
           <Text style={styles.cardTitle}>Análise de Urgência</Text>
           
           <View style={styles.urgencyHeader}>
-            <Badge label={analysis.urgencia.nivel} intent={getUrgencyColor(analysis.urgencia.nivel)} />
+            <Badge label={analysis.urgencia.nivel} intent={getUrgencyColor(analysis.urgencia.nivel) as any} />
             {analysis.urgencia.prazo_limite !== 'N/A' && (
               <View style={styles.deadlineContainer}>
                 <Clock size={16} color="#F59E0B" />
@@ -474,6 +474,51 @@ export default function DetailedAnalysis() {
     </View>
   );
 }
+
+// Helper functions
+const getViabilityColor = (classification: string) => {
+  switch (classification.toLowerCase()) {
+    case 'alta':
+      return '#10B981';
+    case 'média':
+      return '#F59E0B';
+    case 'baixa':
+      return '#EF4444';
+    default:
+      return '#6B7280';
+  }
+};
+
+const getComplexityColor = (complexity: string): 'primary' | 'warning' | 'danger' => {
+  switch (complexity.toLowerCase()) {
+    case 'baixa':
+      return 'primary';
+    case 'média':
+      return 'warning';
+    case 'alta':
+      return 'danger';
+    default:
+      return 'primary';
+  }
+};
+
+const getProbabilityValue = (probability: string) => {
+  const match = probability.match(/(\d+)%/);
+  return match ? parseInt(match[1]) / 100 : 0;
+};
+
+const getUrgencyColor = (urgency: string): 'primary' | 'warning' | 'danger' => {
+  switch (urgency.toLowerCase()) {
+    case 'baixa':
+      return 'primary';
+    case 'média':
+      return 'warning';
+    case 'alta':
+      return 'danger';
+    default:
+      return 'primary';
+  }
+};
 
 const styles = StyleSheet.create({
   container: {

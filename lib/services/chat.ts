@@ -4,13 +4,16 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 export interface MessageData {
   id: string;
   case_id: string;
-  user_id: string;
+  sender_id: string; // Changed from user_id to sender_id for consistency
+  user_id?: string; // Keep for backward compatibility
   content: string;
   read: boolean;
   created_at: string;
   sender?: {
     name: string;
+    full_name?: string; // Add full_name property
     avatar?: string;
+    avatar_url?: string; // Add avatar_url property 
     role: 'client' | 'lawyer' | 'admin';
   };
 }

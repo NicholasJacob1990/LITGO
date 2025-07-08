@@ -11,6 +11,8 @@ interface CaseActionsProps {
   onChat?: () => void;
   onViewSummary?: () => void;
   onSchedule?: () => void;
+  onScheduleConsult?: () => void;
+  onViewDocuments?: () => void;
   variant?: 'compact' | 'full';
   showSummary?: boolean;
   showSchedule?: boolean;

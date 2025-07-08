@@ -262,6 +262,9 @@ export interface Match {
   fair?: number;
   equity?: number;
   features?: Record<string, any>;
+  breakdown?: {
+    [key: string]: number;
+  };
 }
 
 export interface MatchResponseAPI {
@@ -300,11 +303,40 @@ export function getMatchesForCase(
 export type { Match as MatchResult };
 
 const api = {
-  get: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'GET' }),
+  get: (endpoint: string, options: (RequestInit & { params?: Record<string, any> }) = {}) => {
+    const { params, ...requestOptions } = options;
+    let url = endpoint;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+    return apiFetch(url, { ...requestOptions, method: 'GET' });
+  },
   post: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
   patch: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
   put: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
   delete: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'DELETE' }),
 };
+
+// Create a new case
+export function createCase(caseData: any): Promise<any> {
+  return apiFetch('/cases', {
+    method: 'POST',
+    body: JSON.stringify(caseData),
+  });
+}
+
+// Get matches for a case
+export function getMatches(caseId: string): Promise<any> {
+  return getPersistedMatches(caseId);
+}
 
 export default api; 

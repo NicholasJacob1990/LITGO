@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, SafeAreaView } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import Daily, { DailyEvent, DailyCall } from '@daily-co/react-native-daily-js';
+import Daily, { DailyCall } from '@daily-co/react-native-daily-js';
 import { 
   DailyProvider, 
   useLocalParticipant, 
@@ -41,7 +41,7 @@ const ParticipantTile = ({ sessionId, isLocal }: { sessionId: string; isLocal: b
 };
 
 const CallView = () => {
-  const callObject = useCallObject();
+  const callObject = useCallObject() as any;
   const meetingState = useMeetingState();
   const localParticipant = useLocalParticipant();
 
@@ -59,7 +59,7 @@ const CallView = () => {
     callObject.setLocalAudio(!callObject.localAudio());
   }, [callObject]);
 
-  if (meetingState === 'joining' || meetingState === 'loading' || !localParticipant) {
+  if ((meetingState as string) === 'joining' || (meetingState as string) === 'loading' || !localParticipant) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -93,7 +93,7 @@ export default function VideoConsultation() {
     const co = Daily.createCallObject();
     setCallObject(co);
     
-    const events: DailyEvent[] = ['left-meeting', 'error'];
+    const events: string[] = ['left-meeting', 'error'];
     const handleEvent = () => {
       co.destroy();
       navigation.goBack();
@@ -108,7 +108,7 @@ export default function VideoConsultation() {
 
     return () => {
       events.forEach((event) => co.off(event, handleEvent));
-      if (co.meetingState() !== 'left-meeting') {
+      if (co && !co.isDestroyed) {
         co.destroy();
       }
     };
