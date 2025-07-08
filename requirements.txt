@@ -11,7 +11,6 @@ sqlalchemy==2.0.23
 
 # Redis and caching
 aioredis==2.0.1
-redis[hiredis]==5.0.1
 
 # Async and HTTP
 httpx==0.25.2
