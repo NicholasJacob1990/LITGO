@@ -22,7 +22,10 @@ export interface DocumentData {
 
 export interface DocumentUploadData {
   name: string;
-  file: File | string; // File object or base64 string
+  file?: File | string; // File object or base64 string
+  uri?: string; // Add uri support for React Native
+  type?: string; // Add type support for MIME type
+  size?: number; // Add size support
   description?: string;
   category?: DocumentData['category'];
 }

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet, RefreshControl, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { User, Briefcase, Calendar, Info } from 'lucide-react-native';
-import api from '@/lib/services/api'; // Corrigido o caminho da API
+import { API_URL, getAuthHeaders } from '@/lib/services/api'; // Fixed import
 
 const PRIMARY_COLOR = '#0D47A1';
 const GREY_COLOR = '#64748B';
@@ -28,12 +28,17 @@ interface AggregatedClient {
 
 // Função para buscar os contratos via API
 const fetchContracts = async (): Promise<Contract[]> => {
-  const { data } = await api.get('/contracts', {
-    params: {
-      status_filter: 'active', // Usando o filtro que a API espera
-      limit: 100, // Pegar um número grande para agregar todos os clientes
-    },
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}/contracts?status_filter=active&limit=100`, {
+    method: 'GET',
+    headers
   });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch contracts');
+  }
+  
+  const data = await response.json();
   return data;
 };
 

@@ -165,4 +165,23 @@ export const getVideoSessionsByCase = async (caseId: string): Promise<VideoSessi
     throw new Error('Erro ao buscar sessões de vídeo.');
   }
   return data;
+};
+
+// Export missing functions for compatibility
+export const createVideoConsultation = async (caseId: string): Promise<VideoSessionData> => {
+  return startVideoSession(caseId);
+};
+
+export const getVideoSession = async (sessionId: string): Promise<VideoSession | null> => {
+  const { data, error } = await supabase
+    .from('video_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching video session:', error);
+    return null;
+  }
+  return data;
 }; 

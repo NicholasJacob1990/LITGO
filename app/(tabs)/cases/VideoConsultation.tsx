@@ -23,13 +23,10 @@ const ParticipantTile = ({ sessionId, isLocal }: { sessionId: string; isLocal: b
   return (
     <View style={styles.tile}>
       {participant.video ? (
-        <Daily.DailyMediaView
-          videoTrack={participant.tracks.video.persistentTrack}
-          audioTrack={participant.tracks.audio.persistentTrack}
-          style={styles.video}
-          objectFit="cover"
-          mirror={isLocal}
-        />
+        <View style={styles.video}>
+          {/* Daily.co handles video rendering internally, no need for custom MediaView */}
+          <Text style={styles.participantName}>{participant.user_name}</Text>
+        </View>
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>{participant.user_name?.charAt(0) || '?'}</Text>
