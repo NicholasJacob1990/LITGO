@@ -41,7 +41,7 @@ const ParticipantTile = ({ sessionId, isLocal }: { sessionId: string; isLocal: b
 };
 
 const CallView = () => {
-  const callObject = useCallObject();
+  const callObject = useCallObject() as any;
   const meetingState = useMeetingState();
   const localParticipant = useLocalParticipant();
 
@@ -59,7 +59,7 @@ const CallView = () => {
     callObject.setLocalAudio(!callObject.localAudio());
   }, [callObject]);
 
-  if (meetingState === 'joining' || meetingState === 'loading' || !localParticipant) {
+  if ((meetingState as string) === 'joining' || (meetingState as string) === 'loading' || !localParticipant) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -108,7 +108,7 @@ export default function VideoConsultation() {
 
     return () => {
       events.forEach((event) => co.off(event, handleEvent));
-      if (meetingState !== 'left') {
+      if (co && !co.isDestroyed) {
         co.destroy();
       }
     };

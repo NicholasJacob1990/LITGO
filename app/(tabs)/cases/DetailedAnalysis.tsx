@@ -323,7 +323,7 @@ export default function DetailedAnalysis() {
           <Text style={styles.cardTitle}>Análise de Urgência</Text>
           
           <View style={styles.urgencyHeader}>
-            <Badge label={analysis.urgencia.nivel} intent={getUrgencyColor(analysis.urgencia.nivel)} />
+            <Badge label={analysis.urgencia.nivel} intent={getUrgencyColor(analysis.urgencia.nivel) as any} />
             {analysis.urgencia.prazo_limite !== 'N/A' && (
               <View style={styles.deadlineContainer}>
                 <Clock size={16} color="#F59E0B" />

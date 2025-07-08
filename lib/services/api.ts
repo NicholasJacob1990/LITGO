@@ -326,4 +326,17 @@ const api = {
   delete: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'DELETE' }),
 };
 
+// Create a new case
+export function createCase(caseData: any): Promise<any> {
+  return apiFetch('/cases', {
+    method: 'POST',
+    body: JSON.stringify(caseData),
+  });
+}
+
+// Get matches for a case
+export function getMatches(caseId: string): Promise<any> {
+  return getPersistedMatches(caseId);
+}
+
 export default api; 
