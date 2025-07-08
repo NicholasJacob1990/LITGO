@@ -86,10 +86,10 @@ export default function CaseDocuments() {
       setUploading(true);
       
       const uploadedDoc = await uploadDocument(caseId, user?.id || '', {
-        uri: doc.uri,
+        file: doc.uri, // The interface expects 'file' property
         name: doc.name,
-        type: doc.mimeType || 'application/octet-stream',
-        size: doc.size,
+        description: `Documento enviado via app - ${doc.name}`,
+        category: 'other' as const,
       });
       
       setDocuments((prev: DocumentData[]) => [uploadedDoc, ...prev]);
@@ -161,7 +161,7 @@ export default function CaseDocuments() {
                 <Avatar 
                   src={(doc.uploader as any).avatar_url} 
                   name={(doc.uploader as any).full_name} 
-                  size="xsmall" 
+                  size="small" 
                 />
                 <Text style={styles.uploaderName}>
                   {(doc.uploader as any).full_name}

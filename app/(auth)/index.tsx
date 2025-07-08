@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,8 +27,6 @@ import {
   ArrowRight,
   Building2,
 } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
 
 const WelcomeView = ({ onLoginPress }: { onLoginPress: () => void }) => {
   const router = useRouter();

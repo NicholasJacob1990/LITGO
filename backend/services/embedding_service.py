@@ -38,12 +38,18 @@ except ImportError:
 
 try:
     from sentence_transformers import SentenceTransformer
-
-    # Modelo multilíngue pequeno e eficiente
-    local_model = SentenceTransformer('all-MiniLM-L6-v2')
-    LOCAL_MODEL_AVAILABLE = True
-except ImportError:
-    logger.warning("Sentence-transformers não disponível")
+    
+    # Check if we're in testing mode to avoid downloading models
+    if os.getenv("TESTING") == "true":
+        logger.warning("Modo de teste: Sentence-transformers desabilitado")
+        LOCAL_MODEL_AVAILABLE = False
+        local_model = None
+    else:
+        # Modelo multilíngue pequeno e eficiente
+        local_model = SentenceTransformer('all-MiniLM-L6-v2')
+        LOCAL_MODEL_AVAILABLE = True
+except (ImportError, OSError) as e:
+    logger.warning(f"Sentence-transformers não disponível: {e}")
     LOCAL_MODEL_AVAILABLE = False
     local_model = None
 

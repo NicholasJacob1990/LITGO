@@ -5,7 +5,7 @@ import { Video, Mic, MicOff, VideoOff, Phone, MessageCircle, Settings, Users, Cl
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { createVideoConsultation, getVideoSession } from '@/lib/services/video';
+import { startVideoSession, getVideoSessionsByCase } from '@/lib/services/video';
 import VideoCall from '@/components/VideoCall';
 
 export default function VideoConsultationScreen() {
@@ -52,18 +52,15 @@ export default function VideoConsultationScreen() {
       
       if (sessionId) {
         // Se já temos um sessionId, buscar a sessão existente
-        videoSession = await getVideoSession(sessionId);
+        const sessions = await getVideoSessionsByCase(caseId);
+        videoSession = sessions.find(s => s.id === sessionId);
         if (!videoSession) {
           throw new Error('Sessão de vídeo não encontrada');
         }
       } else {
         // Criar nova consulta de vídeo
-        const consultation = await createVideoConsultation(
-          user.id,
-          lawyerId,
-          caseId
-        );
-        videoSession = consultation.session;
+        const consultation = await startVideoSession(caseId);
+        videoSession = consultation;
         
         // Determinar qual token usar baseado no tipo de usuário
         const isLawyer = user.user_metadata?.role === 'lawyer';

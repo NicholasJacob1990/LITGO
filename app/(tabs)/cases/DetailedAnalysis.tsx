@@ -29,8 +29,8 @@ import {
   Shield
 } from 'lucide-react-native';
 import TopBar from '@/components/layout/TopBar';
-import { Badge } from '@/components/atoms/Badge';
-import { ProgressBar } from '@/components/atoms/ProgressBar';
+import Badge from '@/components/atoms/Badge';
+import ProgressBar from '@/components/atoms/ProgressBar';
 import { getDetailedAnalysis } from '@/lib/services/api';
 
 interface DetailedAnalysis {
@@ -129,6 +129,19 @@ export default function DetailedAnalysis() {
     } catch (error) {
       console.error('Erro ao compartilhar:', error);
       Alert.alert('Erro', 'Não foi possível compartilhar a análise');
+    }
+  };
+
+  const getComplexityColor = (complexidade: string): 'neutral' | 'info' | 'warning' | 'danger' => {
+    switch (complexidade?.toLowerCase()) {
+      case 'baixa':
+        return 'info';
+      case 'média':
+        return 'warning';
+      case 'alta':
+        return 'danger';
+      default:
+        return 'neutral';
     }
   };
 

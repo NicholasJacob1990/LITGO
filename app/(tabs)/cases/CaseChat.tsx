@@ -93,11 +93,11 @@ export default function CaseChat() {
 
     try {
       setSending(true);
-      await sendMessage({
-        case_id: caseId,
-        sender_id: user?.id || '',
-        content: newMessage.trim(),
-      });
+      await sendMessage(
+        caseId,
+        user?.id || '',
+        newMessage.trim()
+      );
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -116,8 +116,8 @@ export default function CaseChat() {
 
     const senderName = isMyMessage 
       ? 'Você' 
-      : message.sender?.full_name || 'Usuário Desconhecido';
-    const senderAvatar = message.sender?.avatar_url;
+      : message.sender?.name || 'Usuário Desconhecido';
+    const senderAvatar = message.sender?.avatar;
 
     return (
       <View key={message.id} style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>

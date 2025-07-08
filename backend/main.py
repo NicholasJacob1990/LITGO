@@ -13,11 +13,11 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from backend.main_routes import router as api_router
-from backend.routes import (
-    auth, cases, users, contracts, matching,
-    support, admin, ab_testing, ocr, payments,
-    notifications, reviews, video, reports
-)
+# from backend.routes import (
+#     auth, cases, users, contracts, matching,
+#     support, admin, ab_testing, ocr, payments,
+#     notifications, reviews, video, reports
+# )
 from backend.routes.cases import router as cases_router
 from backend.routes.consultations import router as consultations_router
 from backend.routes.contracts import router as contracts_router
@@ -134,10 +134,10 @@ app.include_router(celery_tasks_router, prefix="/api")
 app.include_router(cases_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(triage_router, prefix="/api/v2", tags=["Intelligent Triage"])
-app.include_router(notifications.router)
-app.include_router(reviews.router)
-app.include_router(video.router)
-app.include_router(reports.router)
+# app.include_router(notifications.router)
+# app.include_router(reviews.router)
+# app.include_router(video.router)
+# app.include_router(reports.router)
 
 # CORREÇÃO: Rate limiter aplicado individualmente nas rotas em routes.py
 # Removido limiter.limit("60/minute")(api_router) que causava erro nos testes

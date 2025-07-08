@@ -5,6 +5,7 @@ export interface MessageData {
   id: string;
   case_id: string;
   user_id: string;
+  sender_id: string;
   content: string;
   read: boolean;
   created_at: string;

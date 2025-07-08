@@ -1,6 +1,14 @@
 # dependencies
 node_modules/
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.coverage
+htmlcov/
+
 # expo
 .expo/
 dist/
