@@ -132,6 +132,19 @@ export default function DetailedAnalysis() {
     }
   };
 
+  const getComplexityColor = (complexidade: string): 'neutral' | 'info' | 'warning' | 'danger' => {
+    switch (complexidade?.toLowerCase()) {
+      case 'baixa':
+        return 'info';
+      case 'média':
+        return 'warning';
+      case 'alta':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
+  };
+
   const getViabilityColor = (classificacao: string) => {
     switch (classificacao?.toLowerCase()) {
       case 'viável':

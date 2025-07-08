@@ -204,8 +204,8 @@ export default function AISummary() {
           </TouchableOpacity>
           
           <CaseActions 
-            onScheduleConsult={() => navigation.navigate('ScheduleConsult', { caseId, analysis: aiAnalysis })}
-            onViewDocuments={() => navigation.navigate('CaseDocuments', { caseId })}
+            onSchedule={() => navigation.navigate('ScheduleConsult', { caseId, analysis: aiAnalysis })}
+            onViewDetails={() => navigation.navigate('CaseDocuments', { caseId })}
           />
         </View>
 
