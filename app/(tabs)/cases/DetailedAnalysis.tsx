@@ -507,6 +507,19 @@ const getProbabilityValue = (probability: string) => {
   return match ? parseInt(match[1]) / 100 : 0;
 };
 
+const getUrgencyColor = (urgency: string): 'primary' | 'warning' | 'danger' => {
+  switch (urgency.toLowerCase()) {
+    case 'baixa':
+      return 'primary';
+    case 'média':
+      return 'warning';
+    case 'alta':
+      return 'danger';
+    default:
+      return 'primary';
+  }
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

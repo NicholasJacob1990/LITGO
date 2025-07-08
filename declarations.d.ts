@@ -54,6 +54,13 @@ declare module '@daily-co/react-native-daily-js' {
     localParticipant(): any;
     sendAppMessage(message: any): void;
     DailyMediaView?: any;
+    on(event: string, handler: (event?: any) => void): void;
+    off(event: string, handler: (event?: any) => void): void;
+    meetingState(): DailyMeetingState | null;
+    callClientId?: string;
+    iframe?: any;
+    isDestroyed?: boolean;
+    loadCss?: any;
   }
 
   export interface DailyCallOptions {
@@ -65,6 +72,18 @@ declare module '@daily-co/react-native-daily-js' {
   export interface DailyMeetingState {
     meetingState: 'new' | 'loading' | 'loaded' | 'joining' | 'joined' | 'left' | 'error';
   }
+
+  export type DailyEvent = 
+    | 'joining-meeting'
+    | 'joined-meeting'
+    | 'left-meeting'
+    | 'participant-joined'
+    | 'participant-left'
+    | 'participant-updated'
+    | 'error';
+
+  export function createCallObject(options?: DailyCallOptions): DailyCall;
+  export const DailyMediaView: any;
 
   export function createDailyCall(options?: DailyCallOptions): DailyCall;
 }

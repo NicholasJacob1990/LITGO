@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator, Text, SafeAreaView } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import Daily, { DailyEvent, DailyCall } from '@daily-co/react-native-daily-js';
+import Daily, { DailyCall } from '@daily-co/react-native-daily-js';
 import { 
   DailyProvider, 
   useLocalParticipant, 
@@ -93,7 +93,7 @@ export default function VideoConsultation() {
     const co = Daily.createCallObject();
     setCallObject(co);
     
-    const events: DailyEvent[] = ['left-meeting', 'error'];
+    const events: string[] = ['left-meeting', 'error'];
     const handleEvent = () => {
       co.destroy();
       navigation.goBack();
@@ -108,7 +108,7 @@ export default function VideoConsultation() {
 
     return () => {
       events.forEach((event) => co.off(event, handleEvent));
-      if (co.meetingState() !== 'left-meeting') {
+      if (meetingState !== 'left') {
         co.destroy();
       }
     };

@@ -303,7 +303,23 @@ export function getMatchesForCase(
 export type { Match as MatchResult };
 
 const api = {
-  get: (endpoint: string, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'GET' }),
+  get: (endpoint: string, options: (RequestInit & { params?: Record<string, any> }) = {}) => {
+    const { params, ...requestOptions } = options;
+    let url = endpoint;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+    return apiFetch(url, { ...requestOptions, method: 'GET' });
+  },
   post: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
   patch: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
   put: (endpoint: string, body: any, options: RequestInit = {}) => apiFetch(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
