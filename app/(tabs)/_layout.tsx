@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Briefcase, User, Users, CreditCard, Gift, Users2, Star } from 'lucide-react-native';
+import { Home, Briefcase, User, Users, Calendar, MessageCircle, HelpCircle, CheckSquare } from 'lucide-react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
@@ -31,20 +31,20 @@ function AppTabs() {
     >
       {[
         { name: 'index', title: 'Início', icon: Home },
-        { name: 'cases', title: 'Meus Casos', icon: Briefcase },
         ...(role === 'client'
           ? [
-              { name: 'recomendacoes', title: 'Recomendações', icon: Star },
-              { name: 'advogados', title: 'Advogados', icon: Users },
-              { name: 'financeiro/index', title: 'Financeiro', icon: CreditCard },
+              { name: 'advogados', title: 'Buscar Advogados', icon: Users },
             ]
           : []),
+        { name: 'cases', title: 'Meus Casos', icon: Briefcase },
+        { name: 'agenda', title: 'Agenda', icon: Calendar },
         ...(role === 'lawyer'
           ? [
-              { name: 'ofertas/index', title: 'Ofertas', icon: Gift },
-              { name: 'clientes/index', title: 'Clientes', icon: Users2 },
+              { name: 'tasks', title: 'Tarefas', icon: CheckSquare },
             ]
           : []),
+        { name: 'chat', title: 'Chat', icon: MessageCircle },
+        { name: 'support', title: 'Suporte', icon: HelpCircle },
         { name: 'profile/index', title: 'Perfil', icon: User },
       ].map(({ name, title, icon: IconComponent }) => (
         <Tabs.Screen
